@@ -22,7 +22,7 @@ if __name__ == '__main__':
         sys.exit(2)
 
     if not os.path.exists(ABSOLUTE):
-        print("[!] There is a problem with the path. Please avoid launching the script using its absolute path.")
+        print("[!] There is a problem with the path. If you are not in the repo directory please launch the script using its absolute path")
 
     if len(sys.argv) == 2 and (sys.argv[1] == "a" or sys.argv[1] == "all"):
         for_all = True
@@ -43,6 +43,7 @@ if __name__ == '__main__':
     add_sym_link = f"ln -s {ABSOLUTE} {TOOLNAME}"
 
     if not for_all:
+        subprocess.run(f"chmod u+x {ABSOLUTE}", shell=True, stdin=DEVNULL, stderr=DEVNULL)
         user = re.findall(PATTERN, id_output)[0].strip("()")
         if not os.path.exists(f"/home/{user}/"):
             # ASK USER FOR ITS HOME DIR.
@@ -70,6 +71,7 @@ if __name__ == '__main__':
 
     else:
         # TO INSTALL THE SCRIPT FOR ALL USERS.
+        subprocess.run(f"chmod +x {ABSOLUTE}", shell=True, stdin=DEVNULL, stderr=DEVNULL)
         os.chdir("/usr/local/bin/")
         subprocess.run("sudo" + add_sym_link, shell=True, stdin=DEVNULL, stdout=DEVNULL)
         print("[+] Successfully installed jwtcrk for all user. Now you can use 'jwtcrk <token> [OPTIONS]'")
