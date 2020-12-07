@@ -616,6 +616,6 @@ if __name__ == '__main__':
         args.token, args.alg, args.key, args.payload, args.auto_try,
         args.inject_kid, args.specify_key, args.jku_basic, args.unverified, args.decode
     )
-    # cracker.run()
+    cracker.run()
     # print(args)
     # print(cracker.key)
