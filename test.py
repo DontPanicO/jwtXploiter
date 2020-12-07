@@ -1,10 +1,23 @@
 #!/usr/bin/python3
 
-"""THIS IS THE TEST SCRIPT. ALL THE SCRIPT HAVE TO BE WRITTEN HERE BEFORE, WITH THE AIM OF BEEN TESTED. ONCE IT IS, IF EVRYTHING
-IS GOOD, WE MOVE IT TO THE MAIN SCRIPT. SO demo.py IS A FILE FOR TESTING SINGLE FUNCTIONS OR VALUES, test.py IS A FILE FOR TEST
-THE ENTIRE SCRIPT, AND jwt-crack.py IS THE FINAL SCRIPT.
+"""
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 """
 
+__version__ = "0.1"
+__author__ = "DontPanicO"
 
 import os
 import sys
@@ -48,7 +61,7 @@ class Cracker:
         token                     [Your JWT.]
         
         Optional:
-        -a --alg <alg>            [The algorithm; None, none, HS256.]
+        -a --alg <alg>            [The algorithm; None, none, HS256, RS256.]
         -k --key <path>           [The path to the key if it's needed.]
         -p --payload <name:value> [The field you want to change in the payload.]
         -d --decode               [Decode the token and quit.]
@@ -58,12 +71,12 @@ class Cracker:
                                    its token, it will work.]
            --specify-key <string> [A string used as key.]
            --inject-kid <exploit> [Try to inject a payload in the kid header; dirtrv, sqli.]
-           --jku-basic <yourIP>   [Basic jku injection. Launching this attack the script
-                                   will craft a jwks.json file based on the jku header, and
-                                   generates the relative token. You have to pass the ip or
-                                   the domain of a vps (or any hosting you own) and before
-                                   submitting the token, copy the jwks file in;
-                                   '<yourIP>/.well-known/jwks.json']
+           --jku-basic <yourIP>   [Basic jku injection. jku attacks are complicated, you need
+                                   some config. You have to host the jwks.json crafted file on
+                                   your pc or on a domain you have. Pass it to this parameter,
+                                   but don't force a path; jwks are a common path, pass only
+                                   the first part of the url, '/.well-known/jwks.json' will be
+                                   automatically appended.]
         
         Examples:
         python3 jwt.py <token> --decode
@@ -204,6 +217,8 @@ class Cracker:
                         Cracker.usage
                     )
                     sys.exit(2)
+        elif self.specified_key is not None:
+            self.key = self.specified_key
         if self.path_to_key is not None:
             if not os.path.exists(self.path_to_key):
                 print(f"{Bcolors.FAIL}ERROR: Seems like the file does not exist{Bcolors.ENDC}")
@@ -211,8 +226,6 @@ class Cracker:
             elif self.alg == "None" or self.alg == "none":
                 print(f"{Bcolors.FAIL}ERROR: You don't need a key with the None algo{Bcolors.ENDC}")
                 sys.exit(2)
-            elif self.specified_key is not None:
-                self.key = self.specified_key
             else:
                 self.file = open(self.path_to_key, 'r')
                 self.key = self.file.read()
@@ -603,6 +616,7 @@ if __name__ == '__main__':
         args.token, args.alg, args.key, args.payload, args.auto_try,
         args.inject_kid, args.specify_key, args.jku_basic, args.unverified, args.decode
     )
-    # cracker.run()
     # print(args)
     # print(cracker.key)
+    cracker.run()
+
