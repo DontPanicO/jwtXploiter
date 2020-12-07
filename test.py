@@ -240,7 +240,7 @@ class Cracker:
         parameters have been called along with -d itself.
 
         """
-        other_args = [self.alg, self.path_to_key, self.user_payload, self.auto_try, self.kid, self.specify, self,jku]
+        other_args = [self.alg, self.path_to_key, self.user_payload, self.auto_try, self.kid, self.specified_key, self.jku_basic]
         if any(arg is not None for arg in other_args) or self.unverified:
             print(f"{Bcolors.WARNING}WARNING: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
         print(f"{Bcolors.HEADER}Header:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_header}{Bcolors.ENDC}" +
