@@ -9,7 +9,8 @@ import re
 SCRIPT_NAME = "jwt-crack.py"
 DEVNULL = open(os.devnull, "wb")
 PATTERN = r'^uid=.+(\(.+\)*?) '
-ABSOLUTE = f"/{'/'.join(sys.argv[0].split('/')[1:-1])}/{SCRIPT_NAME}" if sys.argv[0].startswith("/") and sys.argv[0].endswith(".py") else f"{os.getcwd()}/{SCRIPT_NAME}"
+ABSOLUTE = os.getcwd() + "/" + "/".join(sys.argv[0].split("/")[0:-1]) + "/" + SCRIPT_NAME if not sys.argv[0].startswith("/") \
+           else "/" + "/".join(sys.argv[0].split("/")[1:-1]) + "/" + SCRIPT_NAME
 TOOLNAME = "jwtcrk"
 # print(ABSOLUTE.encode()) # JUST FOR DEBUG
 
