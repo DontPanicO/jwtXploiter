@@ -292,7 +292,7 @@ class Cracker:
         .well-known/jwks.json and write into it the dumps of the dict.
         """
         devnull_ = open(os.devnull, 'wb')
-        command = "wget" + header['jku']
+        command = "wget " + header['jku']
         command_output = subprocess.check_output(command, shell=True, stdin=devnull_, stderr=devnull_)
         jwks = open("jwks.json")
         jwks_dict = json.load(jwks)
@@ -302,7 +302,7 @@ class Cracker:
         jwks_dict['keys'][0]['n'] = base64.urlsafe_b64encode(
             (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
         ).decode('utf-8').rstrip("=")
-        file = open("/.well-known/jwks.json", 'w')
+        file = open("crafted/jwks.json", 'w')
         file.write(json.dumps(jwks_dict))
         devnull_.close()
         file.close()
@@ -322,6 +322,7 @@ class Cracker:
 
         :return: The generated signature.
         """
+        print(self.alg)
         if self.unverified:
             signature = self.token_dict['signature']
         else:
