@@ -162,7 +162,7 @@ class Cracker:
             sys.exit(2)
         """Validate alg"""
         if self.alg is not None:
-            valid_algs = ["None", "none", "HS256", "hs256"]
+            valid_algs = ["None", "none", "HS256", "hs256", "RS256", "rs256"]
             if self.alg not in valid_algs:
                 print(f"{Bcolors.FAIL}ERROR: Invalid algorithm.{Bcolors.ENDC}")
                 sys.exit(2)
@@ -171,6 +171,12 @@ class Cracker:
                     self.alg = "HS256"
                 elif self.alg == "None" or "none":
                     print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
+                elif self.alg == "rs256" or self.alg == "RS256":
+                    if self.jku_basic is None:
+                        print(f"{Bcolors.ERROR}ERROR: RS256 is supported only for jku injection for now.{Bcolors.ENDC}")
+                        sys.exit(1)
+                    if self.alg == "rs256":
+                        self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
         if self.jku_basic is not None:
             if self.alg is not None:
@@ -557,6 +563,8 @@ class Cracker:
         # print(final_token.split(".")[0] == self.token_dict['header'], final_token.split(".")[1] == self.token_dict['payload'])
         if self.file is not None:
             self.file.close()
+        if os.path.exists("jwks.json"):
+        	os.remove("jwks.json")
         sys.exit(0)
 
 
