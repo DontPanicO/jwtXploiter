@@ -328,7 +328,6 @@ class Cracker:
 
         :return: The generated signature.
         """
-        print(self.alg)
         if self.unverified:
             signature = self.token_dict['signature']
         else:
