@@ -9,3 +9,4 @@ Like said in the .py files docstrings, there is a staging workflow to follow.
 	we can move the function to the main script jwt-crack.py.
 
 N.B. Even style related commits, have to be pushed to test.py before, in order to be validated and then applied to jwt-crack.py too.
+

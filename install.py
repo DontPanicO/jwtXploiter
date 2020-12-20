@@ -7,6 +7,7 @@ import re
 
 
 SCRIPT_NAME = "jwt-crack.py"
+REQUIREMENTS = "requirements.txt"
 DEVNULL = open(os.devnull, "wb")
 PATTERN = r'^uid=.+(\(.+\)*?) '
 ABSOLUTE = os.getcwd() + "/" + "/".join(sys.argv[0].split("/")[0:-1]) + "/" + SCRIPT_NAME if not sys.argv[0].startswith("/") \
@@ -43,6 +44,9 @@ if __name__ == '__main__':
     # COMMAND FOR ADD A SYMBOLIC LINK. IT WILL RUN INSIDE A bin/ DIR.
     add_sym_link = f"ln -s {ABSOLUTE} {TOOLNAME}"
 
+    # INSTALL REQUIREMENTS.TXT
+    pip_command = f"pip3 install -r {ABSOLUTE.replace(SCRIPT_NAME, REQUIREMENTS)}"
+
     if not for_all:
         subprocess.run(f"chmod u+x {ABSOLUTE}", shell=True, stdin=DEVNULL, stderr=DEVNULL)
         user = re.findall(PATTERN, id_output)[0].strip("()")
@@ -53,8 +57,8 @@ if __name__ == '__main__':
             home = input("/home/")
             user = home.rstrip("/")
 
-        # COMMAND TO ADD /home/<username>/bin/ TO THE PATH ENV VARIABLE. IT WILL RUN INSIDE THE /home/<username> DIR.
-        add_var = f"echo 'export PATH=$PATH:/home/{user}/bin/' >> .bashrc"
+        # COMMAND TO ADD /home/<username>/bin TO THE PATH ENV VARIABLE. IT WILL RUN INSIDE THE /home/<username> DIR.
+        add_var = f"echo 'export PATH=$PATH:/home/{user}/bin' >> .bashrc"
 
         try:
             os.chdir(f"/home/{user}")
@@ -62,11 +66,14 @@ if __name__ == '__main__':
             # IF THE USER INPUT A NON EXISTING HOME DIR.
             print(f"[!] /home/{user}/ seems to not exists...")
             sys.exit(1)
-        if not os.path.exists(f"/home/{user}/bin/"):
+        if not os.path.exists(f"/home/{user}/bin"):
             # MAKE A BIN DIRECTORY INSIDE /home/<username>.
-            os.mkdir("bin")
-        subprocess.run(add_var, shell=True, stdin=DEVNULL, stderr=DEVNULL)
-        os.chdir(f"/home/{user}/bin")
+            os.mkdir("bin/")
+        bin_paths = subprocess.check_output("echo $path", shell=True, stdin=DEVNULL, stderr=DEVNULL).split(":")
+        if f"/home/{user}/bin" not in bin_paths:
+            # ADD THE BIN DIR TO $PATH ONLY IF IT DOES NOT EXISTS YET
+            subprocess.run(add_var, shell=True, stdin=DEVNULL, stderr=DEVNULL)
+        os.chdir(f"/home/{user}/bin/")
         subprocess.run(add_sym_link, shell=True, stdin=DEVNULL, stderr=DEVNULL)
         print("[+] Successfully installed jwtcrk for your user. Now you can use 'jwtcrk <token> [OPTIONS]'")
 

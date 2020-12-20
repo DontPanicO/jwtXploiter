@@ -121,7 +121,10 @@ class Cracker:
         self.auto_try = auto_try
         self.kid = kid
         self.specified_key = specified_key
-        self.jku_basic = jku_basic
+        if jku_basic is not None:
+            self.jku_basic = jku_basic.rstrip("/")
+        else:
+            self.jku_basic = jku_basic
         self.unverified = unverified
         self.decode = decode
         # print(self.token, self.alg, self.path_to_key, self.user_payload, self.auto_try, self.unverified, self.decode)
