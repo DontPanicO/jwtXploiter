@@ -8,7 +8,3 @@ Write the function in this file, test it and when it's ready to work, move it in
 
 
 
-
-
-
-
