@@ -42,11 +42,16 @@ class Bcolors:
 
 class Cracker:
 
-    description = "A command line tool for cracking JWT"
+    description = "A command line tool for test security of JWTs"
 
     usage = """
-        python3 jwt-crack.py <token> [options] OR
-        jwtcrk <token> [options] IF YOU HAVE USED install.py
+        python3 jwt-crack.py <token> [OPTIONS]; OR
+        jwtcrk <token> [OPTIONS]; IF YOU HAVE USED install.py
+	"""
+
+    man = """
+        python3 jwt-crack.py <token> [options]; OR
+        jwtcrk <token> [options]; IF YOU HAVE USED install.py
         
         Positional:
         token                     [Your JWT.]
@@ -63,22 +68,25 @@ class Cracker:
            --specify-key <string> [A string used as key.]
            --inject-kid <exploit> [Try to inject a payload in the kid header; dirtrv, sqli.]
            --jku-basic <yourURL>  [Basic jku injection. jku attacks are complicated, you need
-                                   some config. You have to host the jwks.json crafted file on
-                                   your pc or on a domain you have. Pass it to this parameter,
+                                   some configs. You have to host the jwks.json crafted file
+                                   on your pc or on a domain you own. Pass it to this parameter,
                                    but don't force a path; jwks have a common path, pass only
                                    the first part of the url, '/.well-known/jwks.json' will be
-                                   automatically appended.]
+                                   automatically appended. Look at the examples for more details.]
            --jku-redirect <mainURL,yourURl>
                                   [Try to use an open redirect to make toe jku header point to
                                    your url. To do this you need to specify the exact place in
                                    the main url, where your url has to be attached. This is done
-                                   with the keyword HERE. Look at the examples for more details.
+                                   with the keyword HERE. Look at the examples for more details.]
         
         Examples:
         jwtcrk <token> --decode
-        jwtcrk <token> --alg None --payload <name:value>
-        jwtcrk <token> --alg HS256 --key <path_to_public.pem> --payload <name:value>
-        jwtcrk <token> --alg rs256 --p <name:value> --jku-redirect https://example.com?redirect=HERE&foo=bar,https://myurl.com
+        jwtcrk <token> --alg None --payload <key>:<value>
+        jwtcrk <token> --alg HS256 --key <path_to_public.pem> --payload <key>:<value>
+        jwtcrk <token> --alg RS256 --payload <key>:<value> --jku-basic http://myurl.com
+        jwtcrk <token> --alg rs256 -p <key>:<value> --jku-redirect https://example.com?redirect=HERE&foo=bar,https://myurl.com
+
+        Documentation: http://
         """
 
     command = [sys.argv[i] for i in range(len(sys.argv))]
@@ -584,7 +592,8 @@ if __name__ == '__main__':
     # Initialize the parser
     parser = argparse.ArgumentParser(
         usage=Cracker.usage,
-        description=Cracker.description
+        description=Cracker.description,
+        formatter_class=argparse.RawTextHelpFormatter
     )
 
     # Add the arguments
@@ -593,17 +602,17 @@ if __name__ == '__main__':
                         help="Your JWT"
                         )
     parser.add_argument("-a", "--alg",
-                        help="The algorithm for the attack (None, HS256)",
-                        required=False
+                        help="The algorithm for the attack (None, none, HS256, RS256)",
+                        metavar="<algorithm>", required=False
                         )
     parser.add_argument("-k", "--key",
                         help="The path to the public key file",
-                        required=False
+                        metavar="<path_to_key>", required=False
                         )
     parser.add_argument("-p", "--payload",
                         action="append", nargs="*",
-                        help="The field you want to change in the payload NAME:VALUE",
-                        required=False
+                        help="The field you want to change in the payload as key:value pairs",
+                        metavar="<key>:<value>", required=False
                         )
     parser.add_argument("-d", "--decode", action="store_true",
                         help="Just decode the token and quit.",
@@ -615,22 +624,23 @@ if __name__ == '__main__':
                         )
     parser.add_argument("--auto-try",
                         help="Try to use a key retrieved from the host ssl certs",
-                        required=False
+                        metavar="<domain>", required=False
                         )
     parser.add_argument("--inject-kid",
                         help="Try for kid injection. Choose a valid payload (DirTrv, SQLi)",
-                        required=False
+                        metavar="<payload>", required=False
                         )
     parser.add_argument("--specify-key",
-                        help="Specify a string to use as key", required=False
+                        help="Specify a string to use as key", metavar="<key>",
+                        required=False
                         )
     parser.add_argument("--jku-basic",
                         help="Specify your ip or domain to host the jwks.json file",
-                        required=False
+                        metavar="<yourURL>", required=False
                         )
     parser.add_argument("--jku-redirect",
                         help="Specify the url with a redirect to the host where jwks.json file will be hosted",
-                        required=False
+                        metavar="<mainURL,yourURL>", required=False
                         )
 
     # Parse arguments
