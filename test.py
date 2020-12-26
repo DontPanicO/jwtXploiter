@@ -21,7 +21,6 @@ import OpenSSL
 import re
 import binascii
 import argparse
-import urllib.parse
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -132,7 +131,8 @@ class Cracker:
         self.jku_header_injection = jku_header_injection
         self.unverified = unverified
         self.decode = decode
-        # print(self.token, self.alg, self.path_to_key, self.user_payload, self.auto_try, self.unverified, self.decode)
+        self.jku_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection]
+        # print(self.token, self.alg, self.path_to_key, self.user_payload, self.auto_try, self.unverified, self.decode)		# DEBUG
         """Call the validation"""
         self.validation()
         self.token_dict = Cracker.dictionarize_token(token)
@@ -155,9 +155,9 @@ class Cracker:
         to the wright argument. First, if a jku argument has been passed, the scripts checks that no other key related one
         has been passed too, and if it quits out. Else it generates a priv pub pair with openssl and extracs the modulus and
         the esponent. Since now, if any jku arg has been passed, we know that not other args has, so the validation ends here.
-        If it goes on, it means that we have no jku arg, so we don't need to check for it later in the function. 
+        If it goes on, it means that we have no jku arg, so we don't need to check for it later in the function.
         If an hostname for self.auto_try has been passed, it call get_key_from_ssl_cert and stores it in self.path_to_key.
-        In this check, if we have self.kid the script quits, cause of the conflict (self.kid uses preset keys). Then if 
+        In this check, if we have self.kid the script quits, cause of the conflict (self.kid uses preset keys). Then if
         we have self.path_to_key, it firsts checks that the path exists and that the alg is different from 'none' or 'None'.
         Else it exits. Then if self.kid is present, checks that it has a proper value, and store the relative preset key.
         If self.kid has an unknown value, the script prints out an errors and quits. Only having no self.kid, an existing
@@ -182,15 +182,14 @@ class Cracker:
                 elif self.alg == "None" or self.alg == "none":
                     print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
                 elif self.alg == "rs256" or self.alg == "RS256":
-                    jku_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection]
-                    if not any(arg is not None for arg in jku_args):
+                    if not any(arg is not None for arg in self.jku_args):
                         print(f"{Bcolors.FAIL}ERROR: RS256 is supported only for jku injection for now.{Bcolors.ENDC}")
                         sys.exit(1)
                     if self.alg == "rs256":
                         self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
-        if self.jku_basic is not None or self.jku_redirect is not None or self.jku_header_injection is not None:
-            if self.jku_basic is not None and self.jku_redirect is not None or self.jku_basic is not None and self.jku_header_injection is not None or self.jku_redirect is not None and self.jku_header_injection is not None:
+        if any(arg is not None for arg in self.jku_args)
+            if len(list(filter(lambda x: x is not None, self.jku_args))) > 1:
                 print(f"{Bcolors.FAIL}ERROR: You can't use two jku injections at the same time.{Bcolors.ENDC}")
                 sys.exit(1)
             if self.alg is not None and self.alg != "RS256":
@@ -198,7 +197,7 @@ class Cracker:
             self.alg = "RS256"
         """Validate key"""
         # MAYBE THIS STEP COULD BE INCLUDED IN THE PREVIOUS ONE???
-        if self.jku_basic is not None or self.jku_redirect is not None or self.jku_header_injection is not None:
+        if any(arg is not None for arg in self.jku_args):
             other_key_related_args = [self.path_to_key, self.auto_try, self.kid, self.specified_key]
             """With jku, you can't use other key related args"""
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
@@ -610,7 +609,7 @@ class Cracker:
         final_token = new_partial_token + "." + signature
         print(f"{Bcolors.HEADER}Crafted header ={Bcolors.ENDC} {Bcolors.OKCYAN}{header}{Bcolors.ENDC}, {Bcolors.HEADER}Crafted payload ={Bcolors.ENDC} {Bcolors.OKCYAN}{payload}{Bcolors.ENDC}")
         print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
-        # print(final_token.split(".")[0] == self.token_dict['header'], final_token.split(".")[1] == self.token_dict['payload'])
+        # print(final_token.split(".")[0] == self.token_dict['header'], final_token.split(".")[1] == self.token_dict['payload'])	# DEBUG
         if self.file is not None:
             self.file.close()
         if os.path.exists("jwks.json"):
@@ -685,7 +684,7 @@ if __name__ == '__main__':
         args.token, args.alg, args.key, args.payload, args.auto_try,
         args.inject_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_body, args.unverified, args.decode
     )
-    # print(args.payload)
-    # print(cracker.key)
+    # print(args.payload)	# DEBUG
+    # print(cracker.key)	# DEBUG
     cracker.run()
 
