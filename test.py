@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
 """
-   should be tested here before be implemented in the real script jwt-crack.py.
-   All functions that have been already tested in demo.py, with positives result,
    A file for test new implementation globally, before merging in the main file.
+   All functions that have been already tested in demo.py, with positives result,
+   should be tested here before be implemented in the real script jwt-crack.py.
 """
 
 
@@ -21,6 +21,7 @@ import OpenSSL
 import re
 import binascii
 import argparse
+import urllib.parse
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -109,16 +110,18 @@ class Cracker:
 
     def __init__(self, token, alg, path_to_key, user_payload, auto_try, kid, specified_key, jku_basic, jku_redirect, jku_header_injection, unverified=False, decode=False):
         """
-        :param token: The user input token -> String. Positional.
-        :param alg: The algorithm for the attack. HS256 or None -> str. Optional.
-        :param path_to_key: The path to the public.pem, if the alg is HS256 -> str. Optional.
-        :param user_payload: What the user want to change in the payload -> str. Optional.
-        :param auto_try: The hostname from which the script try to retrieve a key via openssl -> String. Optional.
-        :param kid: The type of payload to inject in the kid header. DirTrv or SQLi -> str. Optional.
-        :param specified_key: A string set to be used as key -> str. Optional.
-        :param jku_basic: The main url on which the user wnat to host the malformed jwks file -> str. Optional.
-        :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool. Optional.
-        :param decode: A flag to set if the user need only to decode the token -> Bool. Optional
+        :param token: The user input token -> str.
+        :param alg: The algorithm for the attack. HS256 or None -> str.
+        :param path_to_key: The path to the public.pem, if the alg is HS256 -> str.
+        :param user_payload: What the user want to change in the payload -> str.
+        :param auto_try: The hostname from which the script try to retrieve a key via openssl -> str.
+        :param kid: The type of payload to inject in the kid header. DirTrv or SQLi -> str.
+        :param specified_key: A string set to be used as key -> str.
+        :param jku_basic: The main url on which the user want to host the malformed jwks file -> str.
+        :param jku_redirect: Comma separated server url and your one. Use HERE keyword to specify where to replace your url -> str.
+        :param jku_header_injection: The server vulnerable url. Use HERE keywork to specify where to inject -> str
+        :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool.
+        :param decode: A flag to set if the user need only to decode the token -> Bool.
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
@@ -383,7 +386,7 @@ class Cracker:
         """
         Creates a signature for the new token.
 
-        :param partial_token: The first two part of the crafted jwt. String.
+        :param partial_token: The first two part of the crafted jwt -> str.
 
         If self.unverified is present its define the signature as the one of the original token.
         It then checks which algorithm has been chosen by the user; with 'None' algorithm it stores an empty string
@@ -440,7 +443,7 @@ class Cracker:
         """
         A method for verify if a JWT have a valid pattern.
 
-        :param token: A JWT -> String.
+        :param token: A JWT -> str.
 
         Creates a regex pattern and looks if the token match it.
 
@@ -458,7 +461,7 @@ class Cracker:
         """
         A method that stores in a dict the three part ok a JWT.
 
-        :param token: A JWT -> String.
+        :param token: A JWT -> str.
 
         Splits the token in three part (header, payload, signature) and creates a dict with thees data.
 
@@ -475,7 +478,7 @@ class Cracker:
         """
         Corrects a string that is intended to be base64 decoded.
 
-        :param string: A string, base64 encoded part of a JWT -> String.
+        :param string: A string, base64 encoded part of a JWT -> str.
 
          Since JWT are base64 encoded but the equals signs are stripped, this function append them to string
          given as input, only if necessary.
@@ -499,9 +502,28 @@ class Cracker:
                 i += 1
 
     @staticmethod
+    def url_escape(string, chars, spaces=True):
+    """
+    :param string: The string to url encode -> str
+    :param chars: The only characters to encode in the string -> str
+    :param spaces: If true automatically appends a space to the characters to encode -> bool
+
+    The function, given a string, replaces the characters specified in the chars parameter with their url encoded one.
+    By default, if the space character is not specified in the chars parameter, the function automatically appends it.
+
+    :return: The original string with the specified characters url encoded
+    """
+    if " " not in chars and spaces:
+        chars += " "
+    encoded = [urllib.parse.quote(char) for char in chars]
+    for i in range(len(chars)):
+        string = string.replace(chars[i], encoded[i])
+    return string
+
+    @staticmethod
     def decode_encoded_token(iterable):
         """
-        :param iterable: A dict object populated with the three parts of a JWT -> Dict.
+        :param iterable: A dict object populated with the three parts of a JWT -> dict.
 
         This function simply take the header and the payload from a dictionary created with dictionarize_token, passes
         them to append_equals_if_needed and decodes them.
@@ -523,8 +545,8 @@ class Cracker:
     @staticmethod
     def change_payload(user_input, iterable):
         """
-        :param user_input: One of the input name:value passed by the user to change data in the payload -> String.
-        :param iterable: A dict object representing the original decoded payload of the JWT -> Dict.
+        :param user_input: One of the input name:value passed by the user to change data in the payload -> str.
+        :param iterable: A dict object representing the original decoded payload of the JWT -> dict.
 
         Given a string with this 'name:value' format, splits it, look for a <name> key in the iterable and, if it's,
         change its value to <value>. If it doesn't find <name> in the iterable's keys, print an error and quits out.
@@ -547,7 +569,7 @@ class Cracker:
     def encode_token_segment(json_string):
         """
         :param json_string. A decoded string of the header or the payload, with the values changed according to the
-        user input -> String.
+        user input -> str.
 
         Pretty self explanatory...
 
@@ -560,8 +582,8 @@ class Cracker:
     @staticmethod
     def craft_token(header_, payload_):
         """
-        :param header_: The decoded header, with the values changed according to the user input -> String.
-        :param payload_: The decoded payload, with the values changed according to the user input -> String.
+        :param header_: The decoded header, with the values changed according to the user input -> str.
+        :param payload_: The decoded payload, with the values changed according to the user input -> str.
 
         Calls encode_token_segment on the header_ and the payload_ and then sum them.
 
@@ -574,7 +596,7 @@ class Cracker:
     @staticmethod
     def get_key_from_ssl_cert(hostname):
         """
-        :param hostname. The hostname of which you want to retrieve the cert -> string
+        :param hostname. The hostname of which you want to retrieve the cert -> str.
 
         First open devnull to redirect stdin, stdout or stderr if necessary, and defines a regex pattern to match the output of
         our first command. Then defines the command that we need to retrieve an ssl cert and launches it with subprocess and handle
