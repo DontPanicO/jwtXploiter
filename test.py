@@ -235,7 +235,6 @@ class Cracker:
                 key_read = key_file.read()
                 key_file.close()
                 key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, key_read)
-                key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
                 self.key = key
             """The key is converted in a cryptography.hazmat.backends.openssl.rsa._RSAPrivateKey object"""
             self.key.priv = key.to_cryptography_key()
