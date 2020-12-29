@@ -366,7 +366,7 @@ class Cracker:
                 if to_dict == "header":
                     if to_add in header_dict.keys():
                         print(f"{Bcolors.FAIL}You are trying to add a key that alreay exists.{Bcolors.ENDC}")
-                        sys.exit(2)
+                        sys.exit(1)
                     header_dict[to_add] = "default"
                 elif to_dict == "payload":
                     print(f"{Bcolors.WARNING}Adding key to payload is useless since you can do it directly via --payload.{Bcolors.ENDC}")
