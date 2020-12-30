@@ -29,11 +29,8 @@ from cryptography.hazmat.primitives.asymmetric import padding
 try:
     from config import cwd
 except ImportError:
-    path = sys.argv[0]
-    if len(path.split("/")) > 1:
-        cwd = f"{'/'.join(path.split('/')[:-1])}/"
-    else:
-        cwd = ""
+    path = os.path.abspath(sys.argv[0])
+    cwd = "/".join(path.split("/")[:-1]) + "/"
 
 
 class Bcolors:
@@ -188,30 +185,31 @@ class Cracker:
 
     def validation(self):
         """
-        Does some validation on; self.token, self.alg, self.path_to_key, self.auto_try, self.kid self.file and self.key.
+        Does some validation on; self.token, self.alg, and all key related arguments.
         This function is written in a terrible way, but it works. Since it has to handle so many different use cases
-        for me it's enough. If you want to make some restyle, without compromising it functionality, you're welcome.
+        for now it's enough. If you want to make some restyle, without compromising its functionality, you're welcome.
 
         1)Validate the token: Using check_token, looks if the token is valid. If not quits out.
 
         2)Validate alg: If an algorithm has been passed, it checks that's a valid one. If it's None or none it reminds
         to the user that some libraries accept None and other none. Then does a case sensitive correction if hs256 or rs256
-        has been passed as alg. Last but not least, if any jku argument is present, it force the alg to be RSA.
-        Since the user can not passes more than one jku related argument, the script look for this and eventually quits.
+        has been passed as alg. Last but not least, if any jku/x5u argument is present, it force the alg to be RSA.
+        Since the user can not passes more than one jku/x5u related argument, the script look for that and eventually quits.
 
         3)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
         This validation has to solve lot of possible conflicts, at least giving warnings to the user and giving priority
-        to the right argument. First, if a jku argument has been passed, the scripts checks that no other key related one
-        has been passed too, and if it quits out. Else it generates a priv pub pair with openssl and extracs the modulus and
-        the esponent. Since now, if any jku arg has been passed, we know that not other args has, so the validation ends here.
-        If it goes on, it means that we have no jku arg, so we don't need to check for it later in the function.
+        to the right argument. First, if a jku/x5u argument has been passed, the scripts checks that no other key related one
+        has been passed too, and if it quits out. Else it generates a priv pub pair with openssl, or read from a file in case
+        of x5u and extracs the modulus and the esponent. Since now, if any jku/x5u arg has been passed, we know that not other
+        args has, so the validation ends here.
+        If it goes on, it means that we have no jku/x5u arg, so we don't need to check for it later in the function.
         If an hostname for self.auto_try has been passed, it call get_key_from_ssl_cert and stores it in self.path_to_key.
-        In this check, if we have self.kid the script quits, cause of the conflict (self.kid uses preset keys). Then if
-        we have self.path_to_key, it firsts checks that the path exists and that the alg is different from 'none' or 'None'.
-        Else it exits. Then if self.kid is present, checks that it has a proper value, and store the relative preset key.
-        If self.kid has an unknown value, the script prints out an errors and quits. Only having no self.kid, an existing
-        path, and an algorithm different from 'none' and 'None', the script will open the path stored in self.path_to_key,
-        and store its read in self.key.
+        In this check, if we have self.kid, self.specified or self.path_to_key the script quits, cause of the conflict(self.kid
+        uses preset keys). Then it validate self.kid: if self.path_to_key or self.specified has been passed, returns an error
+        and quits. Else goes on and checks that self.kid has a proper value. Then if self.specified has been passed, checks that
+        self.path_to_key has not (at this point we know that other args has not been passed since we have already validated
+        them), and store self.specified value in self.key. Last, if we have self.path_to_key, checks that the path exists and that
+        the algorithm has a proper value. Then read the file and store it in self.key.
 
         """
         """Validate the token"""
@@ -278,7 +276,7 @@ class Cracker:
             self.key.pub.e = self.key.pub.public_numbers().e
             self.key.pub.n = self.key.pub.public_numbers().n
         if self.auto_try is not None:
-            if self.kid is not None or self.specified_key is not None:
+            if self.kid is not None or self.specified_key is not None or self.path_to_key:
                 print(f"{Bcolors.FAIL}ERROR: --inject-kid uses preset keys, this creates a conflict with --auto-try.{Bcolors.ENDC}")
                 sys.exit(2)
             path = Cracker.get_key_from_ssl_cert(self.auto_try)
@@ -301,6 +299,8 @@ class Cracker:
                     )
                     sys.exit(2)
         elif self.specified_key is not None:
+            if self.path_to_key is not None:
+                print(f"{Bcolors.FAIL}ERROR: You have passed two keys with --specify and --key.{Bcolors.ENDC}")
             self.key = self.specified_key
         if self.path_to_key is not None:
             if not os.path.exists(self.path_to_key):
@@ -319,7 +319,7 @@ class Cracker:
 
         Since the decoded header and payload are already been stored when the __init__ method ran, it just displays
         them on the screen.
-        This function is intended to run if -d (or --decode) is present so it print outs some warnings if useless
+        This function is intended to run if -d (or --decode) is present so it prints outs some warnings if useless
         parameters have been called along with -d itself.
 
         """
@@ -342,10 +342,12 @@ class Cracker:
         Starting from the originals decoded header and payload, modify them according to the user input.
 
         Using json, the function create two dictionaries of self.original_token_header and self.original_token_payload,
-        in order to access and modify them as dict object. If we have some header injection like kid or jku, the script
-        modifys those headers with the related payload.
+        in order to access and modify them as dict object. If add_into is present, the function validates it and add the
+        specified key/s in the specified dictionary. If we have some header injection like kid or jku, the script modifys
+        those headers with the related payload.
         It changes the algorithm to the one specified by the user, then look he has also declared any payload change.
         If he has, the function calls the change_payload method, for each change stored in self.user_payload.
+        If self.remove_from has been passed, it removes the speicifed key/s from the corresponding dictionary.
 
         N.B. self.user_payload is a list and, any time the user call a -p, the value went stored in another list inside
         self.user_payload. So it basically contains as many list as the user calls to --payload. And the value of each
@@ -450,7 +452,7 @@ class Cracker:
         :param header: the header dictionary to modify -> dict.
         Get the jwks.json file from the url specified in the jku header. Then loads the file as json and accesses
         it to change the modulus and the esponent with the ones of our generated key. Then creates a new file in
-        .well-known/jwks.json and write into it the dumps of the dict.
+        crafted/jwks.json and write into it the dumps of the dict.
         """
         command = "wget " + header['jku']
         command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
