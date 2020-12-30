@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3.8
 
 """
    Copyright 2021 © Andrea Tedeschi (DontPanicO) <andreatedeschi95@gmail.com>
