@@ -294,13 +294,13 @@ class Cracker:
                     self.key = "zzz"
                 else:
                     print(
-                        f"{Bcolors.FAIL}ERROR: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}",
-                        Cracker.usage
+                        f"{Bcolors.FAIL}ERROR: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}"
                     )
                     sys.exit(2)
         elif self.specified_key is not None:
             if self.path_to_key is not None:
                 print(f"{Bcolors.FAIL}ERROR: You have passed two keys with --specify and --key.{Bcolors.ENDC}")
+                sys.exit(2)
             self.key = self.specified_key
         if self.path_to_key is not None:
             if not os.path.exists(self.path_to_key):
@@ -360,27 +360,33 @@ class Cracker:
         header_dict['alg'] = self.alg
         if self.add_into:
             for item in self.add_into:
-                to_dict = item[0].split(":")[0]
-                to_add = item[0].split(":")[1]
+                try:
+                    to_dict = item[0].split(":")[0]
+                    to_add = item[0].split(":")[1]
+                except IndexError:
+                    print(f"{Bcolors.FAIL}ERROR: --add-into must have key:value syntax, where key is header or payload.{Bcolors.ENDC}")
+                    sys.exit(2)
                 if to_dict != "header" and to_dict != "payload":
-                    print(f"{Bcolors.FAIL}You can delete keys only from header and payload.{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}ERROR: You can delete keys only from header and payload.{Bcolors.ENDC}")
                     sys.exit(2)
                 if to_dict == "header":
                     if to_add in header_dict.keys():
-                        print(f"{Bcolors.FAIL}You are trying to add a key that already exists.{Bcolors.ENDC}")
-                        sys.exit(1)
+                        print(f"{Bcolors.FAIL}ERROR: You are trying to add a key that already exists.{Bcolors.ENDC}")
+                        sys.exit(2)
                     header_dict[to_add] = "default"
                 elif to_dict == "payload":
-                    print(f"{Bcolors.WARNING}Adding key to payload is useless since you can do it directly via --payload.{Bcolors.ENDC}")
+                    print(f"{Bcolors.WARNING}WARNING: Adding key to payload is useless since you can do it directly via --payload.{Bcolors.ENDC}")
                     if to_add in header_dict.keys():
-                        print(f"{Bcolors.FAIL}You are trying to add a key that already exists.{Bcolors.ENDC}")
+                        print(f"{Bcolors.FAIL}ERROR: You are trying to add a key that already exists.{Bcolors.ENDC}")
                         sys.exit(2)
                     payload_dict[to_add] = "default"
         if self.kid:
+            if "kid" not in header_dict.keys():
+                print(f"{Bcolors.FAIL}ERROR: JWT header has no kid{Bcolors.ENDC}")
             header_dict['kid'] += self.inject_kid()
         elif self.jku_basic:
             if "jku" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}ERROR: JWT header has not jku.{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}ERROR: JWT header has no jku{Bcolors.ENDC}")
                 sys.exit(2)
             if self.manual:
                 url = self.jku_basic
@@ -390,7 +396,13 @@ class Cracker:
             header_dict['jku'] = url
         elif self.jku_redirect:
             if "jku" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}ERROR: JWT header has not jku.{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}ERROR: JWT header has no jku{Bcolors.ENDC}")
+                sys.exit(2)
+            if "HERE" not in self.jku_redirect:
+                print(f"{Bcolors.FAIL}ERROR: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
+                sys.exit(2)
+            if "," not in self.jku_redirect:
+                print(f"{Bcolors.FAIL}ERROR: Missing url. Please pass the vulnerable url and your one as comma separated values{Bcolors.ENDC}")
                 sys.exit(2)
             main_url = self.jku_redirect.split(",")[0]
             your_url = self.jku_redirect.split(",")[1].rstrip("/") + "/.well-known/jwks.json"
@@ -400,6 +412,12 @@ class Cracker:
             if "jku" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}ERROR: JWT header has no jku.{Bcolors.ENDC}")
                 sys.exit(2)
+            if "HERE" not in self.jku_header_injection:
+                print(f"{Bcolors.FAIL}ERROR: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
+                sys.exit(2)
+            if "," not in self.jku_header_injection:
+                print(f"{Bcolors.FAIL}ERROR: Missing url. Please pass the vulnerable url and yur one as comma separated values{Bcolors.ENDC}")
+                sys.exit(2)
             body = self.jku_via_header_injection(header_dict)
             content_length = len(body)
             body = Cracker.url_escape(body, "[]{}")
@@ -408,7 +426,7 @@ class Cracker:
             header_dict['jku'] = url
         elif self.x5u_basic:
             if "x5u" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}ERROR: JWT header has no x5u.{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}ERROR: JWT header has no x5u{Bcolors.ENDC}")
                 sys.exit(2)
             if self.manual:
                 url = self.x5u_basic
@@ -418,7 +436,13 @@ class Cracker:
             header_dict['x5u'] = url
         elif self.x5u_header_injection:
             if "x5u" not in header_dict.keys():
-                print("{}{}")
+                print("{Bcolors.FAIL}ERROR: JWT has no x5u{Bcolors.ENDC}")
+                sys.exit(2)
+            if "HERE" not in self.x5u_header_injection:
+                print(f"{Bcolors.FAIL}ERROR: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
+                sys.exit(2)
+            if "," not in self.x5u_header_injection:
+                print(f"{Bcolors.FAIL}ERROR: Missing url. Please pass the vulnerable url and your one as comma separated values{Bcolors.ENDC}")
                 sys.exit(2)
             body = self.x5u_via_header_injection(header_dict)
             content_length = len(body)
@@ -431,13 +455,17 @@ class Cracker:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
         if self.remove_from:
             for item in self.remove_from:
-                from_dict = item[0].split(":")[0]
-                to_del = item[0].split(":")[1]
+                try:
+                    from_dict = item[0].split(":")[0]
+                    to_del = item[0].split(":")[1]
+                except IndexError:
+                    print(f"{Bcolors.FAIL}ERROR: --remove-from must have key:value syntax, where key is header or payload{Bcolors.ENDC}")
+                    sys.exit(2)
                 if from_dict != "header" and from_dict != "payload":
-                    print(f"{Bcolors.FAIL}You can delete keys only from header or payload{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}ERROR: You can delete keys only from header or payload{Bcolors.ENDC}")
                     sys.exit(2)
                 if from_dict == "header" and to_del == "alg" or from_dict == "header" and to_del == "typ":
-                    print(f"{Bcolors.FAIL}Deleting key {to_del} will invalidate the token{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}ERROR: Deleting key {to_del} will invalidate the token{Bcolors.ENDC}")
                     sys.exit(1)
                 if from_dict == "header":
                     header_dict = Cracker.delete_key(header_dict, to_del)
@@ -732,7 +760,7 @@ class Cracker:
             user_payload_name = user_payload[0]
             user_payload_value = user_payload[1]
         except IndexError:
-            print(f"{Bcolors.FAIL}ERROR: Payload must have this syntax: name:value. You have write '{user_input}'{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}ERROR: Payload must have this syntax: name:value. You have written '{user_input}'{Bcolors.ENDC}")
             sys.exit(2)
         if user_payload_name not in iterable.keys():
             print(f"{Bcolors.WARNING}WARNING: can't find {user_payload_name} in the token payload. It will be added{Bcolors.ENDC}")
