@@ -971,7 +971,7 @@ if __name__ == '__main__':
                         metavar="<mainURL>", required=False
                         )
     parser.add_argument("--manual", action="store_true",
-                        help="Specify this flag with jku/x5u basic if you need to craft an url without the tool appending or replaceing anything to it",
+                        help="Use this flag with jku/x5u basic if you need to craft an url without the tool appending or replaceing anything to it",
                         required=False
                         )
 
