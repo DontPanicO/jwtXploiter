@@ -1,6 +1,6 @@
 #!/bin/bash
 
-forall=$1
+forall="$1"
 script_name="jwt-crack.py"
 main_path="$(realpath $0)"
 #main_path=$(echo $raw_path | cat | sed 's://:/:')

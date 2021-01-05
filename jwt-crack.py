@@ -140,7 +140,8 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, output_file, unverified=False, decode=False, manual=False):
+    def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, specified_key,
+                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, output_file, unverified=False, decode=False, manual=False):
         """
         :param token: The user input token -> str.
         :param alg: The algorithm for the attack. HS256 or None -> str.
@@ -343,6 +344,7 @@ class Cracker:
                       self.auto_try, self.kid, self.specified_key,
                       self.jku_basic, self.jku_redirect, self.jku_header_injection,
                       self.remove_from, self.x5u_basic, self.x5u_header_injection,
+                      self.add_into, self.output_file
         ]
         if any(arg is not None for arg in other_args) or self.unverified or self.manual:
             print(f"{Bcolors.WARNING}WARNING: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
@@ -358,7 +360,7 @@ class Cracker:
         For now this function is bad writtend since it grab some values from the class attributes, and others via
         keyword arguments. Anyway for now it works.
         """
-        already_specified_keys = ["self", "token", "alg", "user_payload", "path_to_key", "specified_key"]
+        already_specified_keys = ["self", "token", "alg", "user_payload", "path_to_key", "remove_from", "add_into", "specified_key"]
         file_output = f"""
 {Bcolors.OKBLUE}[ORIGINAL]{Bcolors.ENDC}
 {Bcolors.HEADER}ORGINAL_TOKEN{Bcolors.ENDC} = {self.args['token']}
@@ -373,9 +375,9 @@ class Cracker:
 {Bcolors.OKBLUE}[OPTIONS]{Bcolors.ENDC}
 {Bcolors.HEADER}ALG{Bcolors.ENDC} = {self.args['alg']}
 {Bcolors.HEADER}KEY{Bcolors.ENDC} = {self.key}
-{Bcolors.HEADER}REMOVED{Bcolors.ENDC} = {[item[0] for item in self.args['remove_from']]}
-{Bcolors.HEADER}ADDED{Bcolors.ENDC} = {[item[0] for item in self.args['add_into']]}
-{Bcolors.HEADER}PAYLOAD_CHANGES{Bcolors.ENDC} = {[item[0] for item in self.args['user_payload']]}
+{Bcolors.HEADER}REMOVED{Bcolors.ENDC} = {[item[0] for item in self.args['remove_from']] if self.args['remove_from'] else 'nothing'}
+{Bcolors.HEADER}ADDED{Bcolors.ENDC} = {[item[0] for item in self.args['add_into']] if self.args['add_into'] else 'nothing'}
+{Bcolors.HEADER}PAYLOAD_CHANGES{Bcolors.ENDC} = {[item[0] for item in self.args['user_payload']] if self.args['user_payload'] else 'nothing'}
 {Bcolors.HEADER}OTHER_OPTIONS{Bcolors.ENDC} = {[f"{k}: {v}" for k, v in self.args.items() if k not in already_specified_keys and v]}
 
 {Bcolors.OKBLUE}[NEW]{Bcolors.ENDC}
@@ -385,7 +387,7 @@ class Cracker:
 {Bcolors.HEADER}NEW_PAYLOAD{Bcolors.ENDC} = {kwargs['np']}
 {Bcolors.HEADER}NEW_SIGNATURE{Bcolors.ENDC} = {kwargs['ns']}
 {Bcolors.HEADER}NEW_TOKEN{Bcolors.ENDC} = {kwargs['nt']}
-        """
+     \n """
         return file_output
 
     def modify_header_and_payload(self):
@@ -927,9 +929,13 @@ class Cracker:
         signature = self.select_signature(new_partial_token)
         final_token = new_partial_token + "." + signature
         if self.output_file:
-            content_ = self.generate_output(ndh=header, ndp=payload, nh=new_partial_token.split(".")[0], np=new_partial_token.split(".")[1], ns=signature, nt=final_token)
+            content_ = self.generate_output(
+                ndh=header, ndp=payload, nh=new_partial_token.split(".")[0],
+                np=new_partial_token.split(".")[1], ns=signature, nt=final_token
+            )
             with open(self.output_file, 'w') as outfile:
                 outfile.write(content_)
+            subprocess.run(f"chmod 400 {self.output_file}", shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull)
         print(f"{Bcolors.HEADER}Crafted header ={Bcolors.ENDC} {Bcolors.OKCYAN}{header}{Bcolors.ENDC}, {Bcolors.HEADER}Crafted payload ={Bcolors.ENDC} {Bcolors.OKCYAN}{payload}{Bcolors.ENDC}")
         print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
         if self.file is not None:
