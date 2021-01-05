@@ -242,7 +242,7 @@ class Cracker:
                 elif self.alg == "None" or self.alg == "none":
                     if any(self.require_alg_args):
                         print(f"{Bcolors.FAIL}ERROR: You don't need a key with None/none algorithm{Bcolors.ENDC}")
-                        sys.exit(0)
+                        sys.exit(1)
                     print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
                 elif self.alg == "rs256" or self.alg == "RS256":
                     if not any(arg is not None for arg in self.jwks_args):
@@ -268,7 +268,7 @@ class Cracker:
             other_key_related_args = [self.path_to_key, self.auto_try, self.kid, self.specified_key]
             """With jku, you can't use other key related args"""
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
-                print(f"{Bcolors.FAIL}ERROR: please don't pass any key related args with jku attacks{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}ERROR: please don't pass any key related arg with jku attacks{Bcolors.ENDC}")
                 sys.exit(2)
             if not self.x5u_basic and not self.x5u_header_injection:
                 """Generate a key with OpenSSL"""
@@ -291,8 +291,8 @@ class Cracker:
             self.key.pub.e = self.key.pub.public_numbers().e
             self.key.pub.n = self.key.pub.public_numbers().n
         if self.auto_try is not None:
-            if self.kid is not None or self.specified_key is not None or self.path_to_key:
-                print(f"{Bcolors.FAIL}ERROR: --inject-kid uses preset keys, this creates a conflict with --auto-try{Bcolors.ENDC}")
+            if self.kid is not None or self.specified_key is not None or self.path_to_key is not None:
+                print(f"{Bcolors.FAIL}ERROR: --auto-try retrieves the key from ssl certs. Do not pass any other key related arg{Bcolors.ENDC}")
                 sys.exit(2)
             path = Cracker.get_key_from_ssl_cert(self.auto_try)
             self.path_to_key = path
@@ -308,8 +308,8 @@ class Cracker:
                     self.kid = "SQLi"
                     self.key = "zzz"
                 elif self.kid.lower() == "rce":
-                    pattern = r'^.+:.*$'
-                    if not self.kid_curl_info or not re.match(pattern, self.kid_curl_info):
+                    matching__ip_port_pattern = r'^.+:.*$'
+                    if not self.kid_curl_info or not re.match(matching_ip_port_pattern, self.kid_curl_info):
                         print(f"{Bcolors.FAIL}ERROR: Missing or invalid --kid-curl-info. You must specify an ip:port (or ip: if port is 80){Bcolors.ENDC}")
                         sys.exit(2)
                     self.kid = "RCE"
@@ -347,7 +347,7 @@ class Cracker:
                       self.auto_try, self.kid, self.specified_key,
                       self.jku_basic, self.jku_redirect, self.jku_header_injection,
                       self.remove_from, self.x5u_basic, self.x5u_header_injection,
-                      self.add_into,
+                      self.add_into, self.kid_curl_info,
         ]
         if any(arg is not None for arg in other_args) or self.unverified or self.manual:
             print(f"{Bcolors.WARNING}WARNING: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
