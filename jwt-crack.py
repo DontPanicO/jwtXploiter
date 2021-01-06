@@ -152,7 +152,7 @@ class Cracker:
         """
 
     def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, kid_curl_info, exec_via_kid, specified_key,
-                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False, start_from_token=False):
+                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False):
         """
         :param token: The user input token -> str.
         :param alg: The algorithm for the attack. HS256 or None -> str.
@@ -202,14 +202,9 @@ class Cracker:
         self.unverified = unverified
         self.decode = decode
         self.manual = manual
-        self.start_from_token = start_from_token
         """Groups args based on requirements"""
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection]
         self.require_alg_args = [self.path_to_key, self.auto_try, self.kid, self.specified_key] + self.jwks_args
-        self.modify_token_args = [
-                                  self.user_payload, self.remove_from, self.add_into, self.kid, self.kid_curl_info,
-                                  self.exec_via_kid, self.manual,
-        ]
         """Store a command that need to run in case of x5u injection and open devnull"""
         self.x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/State=Ohio/L=Columbus/O=TestingInc/CN=testing"'
         self.devnull = open(os.devnull, 'wb')
@@ -284,10 +279,6 @@ class Cracker:
         if self.manual:
             if not self.jku_basic and not self.x5u_basic:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You can use --manual only with jku/x5u basic injections{Bcolors.ENDC}")
-                sys.exit(1)
-        if self.start_from_token:
-            if any(self.modify_token_args):
-                print(f"{Bcolors.FAIL}jwtcrk: err: You can't modify the token if --start-from-token is present{Bcolors.ENDC}")
                 sys.exit(1)
         """Validate key"""
         if any(arg is not None for arg in self.jwks_args):
@@ -383,7 +374,7 @@ class Cracker:
                       self.auto_try, self.kid, self.specified_key,
                       self.jku_basic, self.jku_redirect, self.jku_header_injection,
                       self.remove_from, self.x5u_basic, self.x5u_header_injection,
-                      self.add_into, self.kid_curl_info,
+                      self.add_into, self.kid_curl_info, self.exec_via_kid,
         ]
         if any(arg is not None for arg in other_args) or self.unverified or self.manual:
             print(f"{Bcolors.WARNING}jwtcrk: warn: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
@@ -978,7 +969,8 @@ if __name__ == '__main__':
     # Add the arguments
     parser.add_argument(
                         "token",
-                        help="Your JWT"
+                        help="Your JWT",
+                        default=sys.stdin if sys.stdin.isatty() else None
                         )
     parser.add_argument("-a", "--alg",
                         help="The algorithm for the attack (None, none, HS256, RS256)",
@@ -1026,7 +1018,7 @@ if __name__ == '__main__':
                         metavar="<command>", required=False
                         )
     parser.add_argument("--specify-key",
-                        help="Specify a string to use as key", metavar="<key>",
+                        help="Specify a string to be used as key", metavar="<key>",
                         required=False
                         )
     parser.add_argument("--jku-basic",
@@ -1053,10 +1045,6 @@ if __name__ == '__main__':
                         help="Use this flag with jku/x5u basic if you need to craft an url without the tool appending or replaceing anything to it",
                         required=False
                         )
-    parser.add_argument("--start-from-token", action="store_true",
-                        help="Use the input token, as it's aready been crafted and just sign it",
-                        required=False
-                        )
 
     # Parse arguments
     args = parser.parse_args()
@@ -1064,7 +1052,7 @@ if __name__ == '__main__':
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid, args.kid_curl_info,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
-        args.unverified, args.decode, args.manual, args.start_from_token
+        args.unverified, args.decode, args.manual,
     )
     # Start the cracker
     cracker.run()
