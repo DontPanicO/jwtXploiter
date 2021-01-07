@@ -2,7 +2,7 @@ This is a Readme for contributions to this script.
 
 Like said in the .py files docstrings, there is a staging workflow to follow.
 
-1)  If you have an idea for a new function or for a function update to an existing one, you have to start from demo.py.
+1)  If you have an idea for a new function or for any improvement, you have to start from demo.py.
 2)  When the new function works, move it to test.py and try it working in the entire script. This is needed since there are lot of
 	possible conflicts in the script, so a function working alone, may needs some changes once inserted in the script.
 3)  When the function is working in test.py, all possible conflict has been prevented, warnings and errors have been set in the script,

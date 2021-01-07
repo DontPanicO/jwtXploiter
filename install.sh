@@ -3,8 +3,7 @@
 forall="$1"
 script_name="jwt-crack.py"
 main_path="$(realpath $0)"
-#main_path=$(echo $raw_path | cat | sed 's://:/:')
-tool_path=$(echo $main_path | cat | sed 's:install\.sh:jwt-crack.py:')
+tool_path=$(echo $main_path | cat | sed 's:install\.sh:jwt-crack\.py:')
 req_path=$(echo $main_path | cat | sed 's:isntall\.sh:requirements\.txt:')
 config_path=$(echo $main_path | cat | sed 's:install\.sh:config\.py:')
 to_config=$(echo $main_path | cat | sed 's:install\.sh::')
