@@ -318,7 +318,7 @@ class Cracker:
                 print(f"{Bcolors.FAIL}jwtcrk: err: Code execution via kid needs no key. --autotry can't be ignored{Bcolors.ENDC}")
             path = Cracker.get_key_from_ssl_cert(self.auto_try)
             self.path_to_key = path
-        if self.kid is not None:
+        elif self.kid is not None:
             if self.exec_via_kid is not None:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You can't run two different kid injections at once{Bcolors.ENDC}")
                 sys.exit(2)
@@ -338,6 +338,7 @@ class Cracker:
                         print(f"{Bcolors.FAIL}jwtcrk: err: Missing or invalid --kid-curl-info. You must specify an ip:port (or ip: if port is 80){Bcolors.ENDC}")
                         sys.exit(2)
                     self.kid = "RCE"
+                    """Command will be executed before the server validates the signature"""
                     self.key = "itdoesnotmatter"
                 else:
                     print(f"{Bcolors.FAIL}jwtcrk: err: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}")
@@ -363,7 +364,7 @@ class Cracker:
         """
         The JWT "decoding" function.
 
-        Since the decoded header and payload are already been stored when the __init__ method ran, it just displays
+        Since the decoded header and payload have already been stored when the __init__ method ran, it just displays
         them on the screen.
         This function is intended to run if -d (or --decode) is present so it prints outs some warnings if useless
         parameters have been called along with -d itself.
@@ -398,7 +399,7 @@ class Cracker:
 
         N.B. self.user_payload is a list and, any time the user call a -p, the value went stored in another list inside
         self.user_payload. So it basically contains as many list as the user calls to --payload. And the value of each
-        calls will always be the firs and only element of each list.
+        calls will always be the firs and only element of each list. This is also valid for self.add_into and self.remove_from.
 
         :return: The modified header and payload strings.
         """
@@ -439,7 +440,7 @@ class Cracker:
                 url = self.jku_basic
             else:
                 if self.jku_basic.endswith("jwks.json"):
-                    print(f"{Bcolors.FAIL}jwtcrk: err: '/.well-known/jwks.json' will automatically be appended to you url. If you need to specify the complete url please use --manual{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtcrk: err: '/.well-known/jwks.json' will automatically be appended to you url. If you need to specify the complete url use --manual{Bcolors.ENDC}")
                     sys.exit(2)
                 url = self.jku_basic.rstrip("/") + "/.well-known/jwks.json"
             self.jku_basic_attack(header_dict)
@@ -533,10 +534,11 @@ class Cracker:
 
     def jku_basic_attack(self, header):
         """
-        :param header: the header dictionary to modify -> dict.
-        Get the jwks.json file from the url specified in the jku header. Then loads the file as json and accesses
-        it to change the modulus and the esponent with the ones of our generated key. Then creates a new file in
-        crafted/jwks.json and write into it the dumps of the dict.
+        :param header: The header dictionary -> dict.
+
+        Gets the jwks.json file from the url specified in the jku header. Then loads the file as json in order to
+        accesses it to change the modulus and the esponent with the ones of our generated key. Then creates a new
+        file named jwks.json in the crafted/ directory and writes the dump of the jwks dict into it.
         """
         command = "wget " + header['jku']
         try:
@@ -565,11 +567,11 @@ class Cracker:
 
     def jku_via_header_injection(self, header):
         """
-        :param header: the header dictonary to modify -> dict.
-        Same as self.jku_basic_attack, but instead of write a jwks file, it returns in an http response body
+        :param header: The header dictonary -> dict.
+        Same as self.jku_basic_attack, but instead of write a jwks file, returns the content in an HTTP response body
         format.
 
-        :return: The crafted jwks string in an http response body format.
+        :return: The crafted jwks string in an HTTP response body format.
         """
         command = "wget " + header['jku']
         try:
@@ -596,6 +598,13 @@ class Cracker:
         return body
 
     def x5u_basic_attack(self, header):
+        """
+        :param header: The header dictonary -> dict
+
+        Gets the jwks.json file from the url specified in the x5u header. Then loads the file as json in order to
+        access it and changes the x5c (the X509 cert) with our generated one. Then creates a file named jwks.json
+        under the crafted/ directory and write the dump of the jwks dict into it.
+        """
         command = "wget " + header['x5u']
         try:
             command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
@@ -620,6 +629,14 @@ class Cracker:
         os.remove(filename)
 
     def x5u_via_header_injection(self, header):
+        """
+        :param header: The header dictonary -> dict
+
+        Same as self.x5u_basic attack, but instead of write the jwks file, returns its content in an HTTP response
+        body format.
+
+        :return: The crafted jwks string in an HTTP response body format.
+        """
         command = "wget " + header['x5u']
         try:
             command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
@@ -647,11 +664,10 @@ class Cracker:
         :param partial_token: The first two part of the crafted jwt -> str.
 
         If self.unverified is present its define the signature as the one of the original token.
-        It then checks which algorithm has been chosen by the user; with 'None' algorithm it stores an empty string
+        Else, it checks which algorithm has been chosen by the user; with 'None' algorithm it stores an empty string
         as signature, while with HS256 it encrypts the partial_token with the key (self.keys) and, of course, using
-        sha256. It encodes it in base64, and strip all trailing '='. With RSA it use self.key.priv to sign the token
-        and we use another module to that since is the one that define the class of which self.key.priv is instance
-        of, and we need a padding that this module provides us.
+        sha256. It encodes it in base64, and strips all trailing '='. With RSA it use self.key.priv to sign the token,
+        using sha256 as algorithm and PKCS1v15 as padding. It encodes it in base64 and strips all trailing '='.
 
         :return: The generated signature.
         """
@@ -681,7 +697,7 @@ class Cracker:
 
         Defines a dictionary containing payloads to inject in the key header, and grabs the ones select by the user.
 
-        This function is intended to be update with new payloads, the first update should be for the ruby RCE
+        This function is intended to be updated with new payloads.
 
         :return: The related payload string
 
@@ -711,7 +727,7 @@ class Cracker:
 
         Creates a regex pattern and looks if the token match it.
 
-        :return: True, if the token match the pattern, False if not. Bool.
+        :return: True, if the token match the pattern, False if not.
         """
         token_pattern = r"^.+\..+\..*$"
         match = re.match(token_pattern, token)
@@ -744,10 +760,10 @@ class Cracker:
 
         :param string: A string, base64 encoded part of a JWT -> str.
 
-         Since JWT are base64 encoded but the equals signs are stripped, this function append them to string
-         given as input, only if necessary.
+         Since JWT are base64 encoded but the equals signs are stripped, this function appends them to the
+         string given as input, only if necessary.
 
-         If the string can't be decoded after the second equal sign has been appended, it return an error.
+         If the string can't be decoded after the second equal sign has been appended, it returns an error.
 
         :return: A byte-string ready to be base64 decoded.
         """
@@ -770,9 +786,9 @@ class Cracker:
         """
         :param string: The string to url encode -> str
         :param chars: The only characters to encode in the string -> str
-        :param spaces: If true automatically appends a space to the characters to encode -> Bool
+        :param spaces: If true automatically appends a space to the chars parameter -> Bool
 
-        The function, given a string, replaces the characters specified in the chars parameter with their url encoded one.
+        The function, given a string, replaces characters specified in the chars parameter with their url encoded one.
         By default, if the space character is not specified in the chars parameter, the function automatically appends it.
 
         :return: The original string with the specified characters url encoded
@@ -802,14 +818,14 @@ class Cracker:
             header_ = base64.urlsafe_b64decode(header_b64).decode('utf-8')
             payload_ = base64.urlsafe_b64decode(payload_b64).decode('utf-8')
         except UnicodeDecodeError:
-            print(f"{Bcolors.FAIL}jwtcrk: err: Decoding Error. Please be sure, to print a valid jwt{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtcrk: err: Decoding Error. Please be sure to pass a valid jwt{Bcolors.ENDC}")
             sys.exit(2)
         return header_, payload_
 
     @staticmethod
     def change_payload(user_input, iterable):
         """
-        :param user_input: One of the input name:value passed by the user to change data in the payload -> str.
+        :param user_input: A key:value string -> str.
         :param iterable: A dict object representing the original decoded payload of the JWT -> dict.
 
         Given a string with this 'name:value' format, splits it, look for a <name> key in the iterable and, if it's,
@@ -818,15 +834,15 @@ class Cracker:
         :return: The dictionary with the changes done.
         """
         try:
-            user_payload = user_input.split(":")
-            user_payload_key = user_payload[0]
-            user_payload_value = user_payload[1]
+            new_payload = user_input.split(":")
+            new_payload_key = new_payload[0]
+            new_payload_value = new_payload[1]
         except IndexError:
             print(f"{Bcolors.FAIL}jwtcrk: err: Payload must have this syntax: name:value. You have written '{user_input}'{Bcolors.ENDC}")
             sys.exit(2)
-        if user_payload_key not in iterable.keys():
+        if new_payload_key not in iterable.keys():
             print(f"{Bcolors.WARNING}jwtcrk: warn: can't find {user_payload_key} in the token payload. It will be added{Bcolors.ENDC}")
-        iterable[user_payload_key] = user_payload_value
+        iterable[new_payload_key] = new_payload_value
         return iterable
 
     @staticmethod
@@ -866,8 +882,7 @@ class Cracker:
     @staticmethod
     def encode_token_segment(json_string):
         """
-        :param json_string. A decoded string of the header or the payload, with the values changed according to the
-        user input -> str.
+        :param json_string. A json string representing the header or the payload -> str.
 
         Pretty self explanatory...
 
@@ -880,12 +895,12 @@ class Cracker:
     @staticmethod
     def craft_token(header_, payload_):
         """
-        :param header_: The decoded header, with the values changed according to the user input -> str
-        :param payload_: The decoded payload, with the values changed according to the user input -> str
+        :param header_: The json string representing the header -> str
+        :param payload_: The json string representing the payload -> str
 
-        Calls encode_token_segment on the header_ and the payload_ and then sum them.
+        Calls encode_token_segment on header_ and payload_ and then sum them.
 
-        :return: The encoded header + the encoded payload as string. Basically two part of a complete JWT.
+        :return: The encoded header + the encoded payload as string separated by a dot. The firsts two part of a JWT.
         """
         encoded_header = Cracker.encode_token_segment(header_)
         encoded_payload = Cracker.encode_token_segment(payload_)
@@ -897,9 +912,9 @@ class Cracker:
         :param hostname. The hostname of which you want to retrieve the cert -> str
 
         First open devnull to redirect stdin, stdout or stderr if necessary, and defines a regex pattern to match the output of
-        our first command. Then defines the command that we need to retrieve an ssl cert and launches it with subprocess and handle
+        our first command. Then defines the command that we need to retrieve an ssl cert, launches it with subprocess and handle
         enventual errors. At this points, the function uses regex to grab the content that wee need, and writes that content in a
-        file. Then defines the second command that we need, and launches it. Since this command should have no output, if we have,
+        file (cert.pem). Then defines the second command, and launches it. Since this command should have no output, if we have,
         breaks out and returns an error. Else stores the path for the generated key, and closes devnull.
 
         :retrun the path to the generated key.
@@ -934,6 +949,15 @@ class Cracker:
         return key
 
     def run(self):
+        """
+        The function to run the attack.
+
+        This function will run after main conflicts has already been solved, and call methods that already know which attack to run.
+        First, if self.decode is True, run self.decode_and_quit, so the script will quits here. If we goes on, we know that self.alg
+        must not be None, if it's quits out.
+        Else crafts the token header and payload, signs them and generates the final token. Than prints the final token to stdout and
+        checks for open files to close.
+        """
         if self.decode:
             self.decode_and_quit()
         if self.alg is None:
