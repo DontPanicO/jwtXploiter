@@ -1,7 +1,7 @@
 # jwtCracker
 A tool to crack json web token
 
-###Installation
+### Installation
 
 - Clone the repo:
 
@@ -15,7 +15,7 @@ A tool to crack json web token
 
   - chmod +x (or u+x) jwt-crack.py
 
-###To Know
+### To Know
 
 - For attacks that generates a jwks file you will find it under the crafted/ directory.
 
