@@ -5,7 +5,7 @@ Installation
 
 - Clone the repo:
 
-  - git clone #URL
+  - git clone https://github.com/DontPanicO/jwtCracker.git
 
 - Run install.sh
 
