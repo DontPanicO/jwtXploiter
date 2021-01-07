@@ -1,0 +1,16 @@
+=== New feature to craft a jwks cliams in the token header ===
+#A function to modify an existing jwks will be provided as a separated feature.
+# 0=Not Implemented Yet; 1=Already Implemented
+
+- require:
+  - the rsa key pair generation: 1
+  - a method to generate a jwks claim: 0
+    - require:
+      - parameters: n, e, kid
+      - return: the jwk json object
+  - a method to embedd the jwks claim in the token header: 0
+    - require:
+      - parameters: header
+      - return: the header with the inserted jwk
+
+
