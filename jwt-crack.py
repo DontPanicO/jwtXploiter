@@ -154,7 +154,7 @@ class Cracker:
         """
 
     def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, kid_curl_info, exec_via_kid, specified_key,
-                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False
+                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False,
                  generate_jwk=False):
         """
         :param token: The user input token -> str.
@@ -1051,6 +1051,10 @@ if __name__ == '__main__':
                         help="Just decode the token and quit.",
                         required=False
                         )
+    parser.add_argument("--complex-payload", action="append", nargs="+",
+                        help="Acces subclaims. Build a string as keys (separated by '#', in the write order) values (separated by ',' if more than one) as comma separated values.",
+                        metavar="<key#key#key:value>", required=False
+                       )
     parser.add_argument("--remove-from", action="append", nargs="+",
                         help="The section of the token, and the key name to delete as key:value pairs",
                         metavar="<section>:<key>", required=False,
@@ -1107,10 +1111,10 @@ if __name__ == '__main__':
                         help="Use this flag with jku/x5u basic if you need to craft an url without the tool appending or replaceing anything to it",
                         required=False
                         )
-    parse.add_argument("--generate-jwk", action="store_true",
+    parser.add_argument("--generate-jwk", action="store_true",
                        help="Generate a jwk and insert it in the token header",
                        required=False
-                       )
+                        )
 
     # Parse arguments
     args = parser.parse_args()
