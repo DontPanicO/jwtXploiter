@@ -29,13 +29,15 @@ import hmac
 import hashlib
 import base64
 import json
-import OpenSSL
 import re
 import binascii
 import argparse
 import urllib.parse
+
+import OpenSSL
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
+
 try:
     from config import cwd
 except ImportError:
@@ -71,10 +73,10 @@ class Cracker:
     man = """
         python3 jwt-crack.py <token> [options]; OR
         jwtcrk <token> [options]; IF YOU HAVE USED install.py
-        
+
         Positional:
         token                      [Your JWT.]
-        
+
         Optional:
         -a --alg <alg>             [The algorithm; None, none, HS256, RS256.]
         -k --key <path>            [The path to the key if it's needed.]
@@ -131,7 +133,7 @@ class Cracker:
                                     this option, and to the url you specified in --jku-basic or
                                     --x5u-basic, the tool won't append anything. This option is not
                                     compatible with other jku/x5u options.]
-        
+
         Examples:
         jwtcrk <token> --decode
         jwtcrk <token> --alg None --payload <key>:<value>
@@ -511,7 +513,8 @@ class Cracker:
             url = self.x5u_header_injection.replace("HERE", injection)
             header_dict['x5u'] = url
         elif self.generate_jwk:
-            header_dict = Cracker.embed_jwk_in_header(header_dict, self.n, self.e, "identifier")
+            crafted_jwk = Cracker.generate_jwk(self.n, self.e, "identifier")
+            header_dict['jwk'] = crafted_jwk
         if self.user_payload:
             for item in self.user_payload:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
@@ -955,6 +958,15 @@ class Cracker:
 
     @staticmethod
     def generate_jwk(n, e, kid):
+        """
+        Generation of a jwk claim
+
+        :param n: The modulus of the public key -> str
+        :param e: The exponent of the publc key -> str
+        :param kid: The key identifier -> str
+
+        :return: The generated jwk
+        """
         jwk = dict()
         jwk['kty'] = "RSA"
         jwk['kid'] = kid
@@ -964,17 +976,14 @@ class Cracker:
         return jwk
 
     @staticmethod
-    def embed_jwk_in_jwt_header(iterable, n, e, kid):
+    def embed_jwk_in_jwt_header(iterable, jwk):
         """
         :param iterable: The header dictionary -> dict
-        :param n: The modulus of the public key -> str
-        :param e: The exponent of the public key -> str
-        :param kid: A string to be used as kid -> str
+        :param jwk: The jwk to insert into iterable -> dict
 
         :return: The modified header dictionary
         """
-        crafted_jwk = Cracker.generate_jwk(iterable, n, e, kid)
-        iterable['jwk'] = crafted_jwk
+        iterable['jwk'] = jwk
         return iterable
 
     def run(self):
