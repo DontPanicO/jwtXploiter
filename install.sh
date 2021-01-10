@@ -28,8 +28,8 @@ if [[ $forall == "" ]]; then
 
 
 elif [[ $forall == "all" || $forall == "a" ]]; then
-    if [[ $(id | grep sudo) == "" ]]; then
-        echo "You have not sudo privileges. Only root can install the script for all users"
+    if [[ $(id | grep sudo) == "" && $(id | grep "uid=0") == "" ]]; then
+        echo "You have not root privileges. Only root can install the script for all users"
         exit
     fi
     chmod +x $tool_path

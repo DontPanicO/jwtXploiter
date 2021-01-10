@@ -283,7 +283,7 @@ class Cracker:
                     if self.alg == "rs256":
                         self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
-        if any(arg is not None for arg in self.jwks_args):
+        if any(arg and arg is not None for arg in self.jwks_args):
             if len(list(filter(lambda x: x is not None, self.jwks_args))) > 1:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You can't use two jku or x5u injections at the same time{Bcolors.ENDC}")
                 sys.exit(1)
@@ -296,7 +296,7 @@ class Cracker:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You can use --manual only with jku/x5u basic injections{Bcolors.ENDC}")
                 sys.exit(1)
         """Validate key"""
-        if any(arg is not None for arg in self.jwks_args):
+        if any(arg and arg is not None for arg in self.jwks_args):
             other_key_related_args = [self.path_to_key, self.auto_try, self.kid, self.exec_via_kid, self.specified_key]
             """With jku, you can't use other key related args"""
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
@@ -386,14 +386,14 @@ class Cracker:
 
         """
         other_args = [
-                      self.alg, self.path_to_key, self.user_payload,
+                      self.alg, self.path_to_key, self.user_payload, self.complex_payload,
                       self.auto_try, self.kid, self.specified_key,
                       self.jku_basic, self.jku_redirect, self.jku_header_injection,
                       self.remove_from, self.x5u_basic, self.x5u_header_injection,
                       self.add_into, self.kid_curl_info, self.exec_via_kid,
         ]
-        if any(arg is not None for arg in other_args) or self.unverified or self.manual:
-            print(f"{Bcolors.WARNING}jwtcrk: warn: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}", Cracker.usage)
+        if any(arg is not None for arg in other_args) or self.unverified or self.manual or self.generate_jwk:
+            print(f"{Bcolors.WARNING}jwtcrk: warn: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}")
         print(f"{Bcolors.HEADER}Header:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_header}{Bcolors.ENDC}" +
               "\n" +
               f"{Bcolors.HEADER}Payload:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_payload}{Bcolors.ENDC}"
@@ -530,7 +530,7 @@ class Cracker:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
         if self.complex_payload:
             for item in self.complex_payload:
-                payload_dict = Cracker.modify_payload_complex(item[0], payload_dict)
+                payload_dict = Cracker.change_payload_complex(item[0], payload_dict)
         if self.remove_from:
             for item in self.remove_from:
                 try:
@@ -862,7 +862,7 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtcrk: err: Payload must have this syntax: name:value. You have written '{user_input}'{Bcolors.ENDC}")
             sys.exit(2)
         if new_payload_key not in iterable.keys():
-            print(f"{Bcolors.WARNING}jwtcrk: warn: can't find {user_payload_key} in the token payload. It will be added{Bcolors.ENDC}")
+            print(f"{Bcolors.WARNING}jwtcrk: warn: can't find {new_payload_key} in the token payload. It will be added{Bcolors.ENDC}")
         iterable[new_payload_key] = new_payload_value
         return iterable
 
@@ -968,7 +968,7 @@ class Cracker:
         return string
 
     @staticmethod
-    def modify_payload_complex(string, iterable):
+    def change_payload_complex(string, iterable):
         """
         :param string: A key:value pair where key is a set of keys separated by #, and values by commas -> str
         :param iterable: The payload dictionary -> dict
@@ -986,14 +986,18 @@ class Cracker:
             sys.exit(2)
         i = 0
         for key in keys:
-            if i == 0:
-                keys_path = iterable[key]
-            else:
-                if i == len(keys) -1:
-                    keys_path[key] = vals
-                    break
-                keys_path = keys_path[key]
-            i += 1
+            try:
+                if i == 0:
+                    keys_path = iterable[key]
+                else:
+                    if i == len(keys) -1:
+                        keys_path[key] = vals
+                        break
+                    keys_path = keys_path[key]
+                i += 1
+            except (KeyError, TypeError):
+                print(f"{Bcolors.FAIL}jwtcrk: err: Key '{key}' is not present in payload{Bcolors.ENDC}")
+                sys.exit(2)
         return iterable
 
     @staticmethod
@@ -1206,5 +1210,6 @@ if __name__ == '__main__':
         args.kid_curl_info, args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic,
         args.x5u_inbody, args.unverified, args.decode, args.manual, args.generate_jwk,
     )
+
     # Start the cracker
     cracker.run()

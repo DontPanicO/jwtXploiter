@@ -1,5 +1,5 @@
 # jwtCracker
-A tool to crack json web token
+A tool to test the security of json web token
 
 ### Installation
 
