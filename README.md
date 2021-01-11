@@ -27,4 +27,10 @@ A tool to test the security of json web token
   - http://app.com/foo?param=value  -->  http://app.com/foo?param=valueHERE
 - Also, in such cases, be sure to pass the server url and your one as comma separated values.
 
+- '/.well-known/jwks.json' is automatically appended to your url in jku/x5u attacks. So make sure to place the jwks file under
+  this path on your server.
+- If you don't want that happen, use the --manual option, but this option is compatible only with --jku-basic and --x5u-basic
+  so, you will need to manually craft the url and pass it to those options, even for attacks that exploit Open Redirect or
+  HTTP header injection.
+
 - Look at the docs for more detailed examples.
