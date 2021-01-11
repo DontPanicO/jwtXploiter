@@ -98,7 +98,7 @@ class Cracker:
                                     while the value will usually be only one. If you want to inject
                                     a list of values, separates also them with commas.]
            --unverified            [Act as the host does not verify the signature.]
-           --auto-try <hostname>   [Retrieve the key from the host ssl certs.]
+           --auto-try <domain>     [Retrieve the key from the host ssl certs.]
            --specify-key <string>  [A string used as key.]
            --inject-kid <exploit>  [Try to inject a payload in the kid header; dirtrv, sqli or rce.]
            --kid-curl-info <ip:port>
@@ -131,7 +131,7 @@ class Cracker:
                                     an url to a jwks file containing a certificate. The tool will
                                     generate a certificate an will craft a proper jwks file.]
            --x5u-inbody <mainURL>  [Same as --jku-inbody but with x5u header.]
-           --manual                [This bool flag allow you to manually craft an url for the jku
+           --manual                [This bool flag allow you to manually craft and url for the jku
                                     or x5u header, if used with --jku-basic or --x5u-basic.
                                     This is needed since in some situations, automatic options
                                     could be a limit. So if you need to define different urls, use
@@ -171,7 +171,7 @@ class Cracker:
         :param complex_payload: A string (key:value) containing key separated by , to access subclaims -> str
         :param remove_from: What the user want to delete in the header or in the payload -> list.
         :param add_into: What the user want to add in the header (useless in the payload) -> list.
-        :param auto_try: The hostname from which the script try to retrieve a key via openssl -> str.
+        :param auto_try: The domain from which the script try to retrieve a key via openssl -> str.
         :param kid: The type of payload to inject in the kid header. DirTrv, SQLi or RCE -> str.
         :param exec_via_kid: A command to append in the kid header -> str.
         :param specified_key: A string set to be used as key -> str.
@@ -245,7 +245,7 @@ class Cracker:
         of x5u and extracs the modulus and the esponent. Since now, if any jku/x5u arg has been passed, we know that not other
         args has, so the validation ends here.
         If it goes on, it means that we have no jku/x5u arg, so we don't need to check for it later in the function.
-        If an hostname for self.auto_try has been passed, it call get_key_from_ssl_cert and stores it in self.path_to_key.
+        If a domain name for self.auto_try has been passed, it call get_key_from_ssl_cert and stores it in self.path_to_key.
         In this check, if we have self.kid, self.specified or self.path_to_key the script quits, cause of the conflict(self.kid
         uses preset keys). Then it validate self.kid: if self.path_to_key or self.specified has been passed, returns an error
         and quits. Else goes on and checks that self.kid has a proper value. Then if self.specified has been passed, checks that
@@ -265,22 +265,20 @@ class Cracker:
             if self.alg not in valid_algs:
                 print(f"{Bcolors.FAIL}jwtcrk: err: Invalid algorithm{Bcolors.ENDC}")
                 sys.exit(2)
-            else:
-                if self.alg == "hs256":
-                    self.alg = "HS256"
-                elif self.alg == "None" or self.alg == "none":
-                    if any(self.require_alg_args):
-                        print(f"{Bcolors.FAIL}jwtcrk: err: You don't need a key with None/none algorithm{Bcolors.ENDC}")
-                        sys.exit(1)
-                    print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
-                elif self.alg == "rs256" or self.alg == "RS256":
-                    if not any(arg is not None for arg in self.jwks_args):
-                        print(f"{Bcolors.FAIL}jwtcrk: err: RS256 is supported only for jku injection for now{Bcolors.ENDC}")
-                        sys.exit(1)
-                    if self.alg == "rs256":
-                        self.alg = "RS256"
+            if self.alg == "hs256":
+                self.alg = "HS256"
+            elif self.alg == "None" or self.alg == "none":
+                if any(self.require_alg_args):
+                    print(f"{Bcolors.FAIL}jwtcrk: err: You don't need a key with None/none algorithm{Bcolors.ENDC}")
+                    sys.exit(1)
+                print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
+            elif self.alg == "rs256" or self.alg == "RS256":
+                if not any(arg for arg in self.jwks_args):
+                    print(f"{Bcolors.FAIL}jwtcrk: err: RS256 is supported only for jku injection for now{Bcolors.ENDC}")
+                    sys.exit(1)
+                self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
-        if any(arg and arg is not None for arg in self.jwks_args):
+        if any(arg for arg in self.jwks_args):
             if len(list(filter(lambda x: x is not None, self.jwks_args))) > 1:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You can't use two jku or x5u injections at the same time{Bcolors.ENDC}")
                 sys.exit(1)
@@ -293,7 +291,7 @@ class Cracker:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You can use --manual only with jku/x5u basic injections{Bcolors.ENDC}")
                 sys.exit(1)
         """Validate key"""
-        if any(arg and arg is not None for arg in self.jwks_args):
+        if any(arg for arg in self.jwks_args):
             other_key_related_args = [self.path_to_key, self.auto_try, self.kid, self.exec_via_kid, self.specified_key]
             """With jku, you can't use other key related args"""
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
@@ -337,20 +335,19 @@ class Cracker:
             if self.path_to_key is not None or self.specified_key is not None or self.unverified:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You don't need to specify a key for kid injections{Bcolors.ENDC}")
                 sys.exit(2)
+            if self.kid.lower() == "dirtrv":
+                self.kid = "DirTrv"
+                self.key = ""
+            elif self.kid.lower() == "sqli":
+                self.kid = "SQLi"
+                self.key = "zzz"
+            elif self.kid.lower() == "rce":
+                self.kid = "RCE"
+                """Command will be executed before the server validates the signature"""
+                self.key = "itdoesnotmatter"
             else:
-                if self.kid.lower() == "dirtrv":
-                    self.kid = "DirTrv"
-                    self.key = ""
-                elif self.kid.lower() == "sqli":
-                    self.kid = "SQLi"
-                    self.key = "zzz"
-                elif self.kid.lower() == "rce":
-                    self.kid = "RCE"
-                    """Command will be executed before the server validates the signature"""
-                    self.key = "itdoesnotmatter"
-                else:
-                    print(f"{Bcolors.FAIL}jwtcrk: err: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}")
-                    sys.exit(2)
+                print(f"{Bcolors.FAIL}jwtcrk: err: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}")
+                sys.exit(2)
         elif self.exec_via_kid is not None:
             if self.path_to_key is not None or self.specified_key is not None:
                 print(f"{Bcolors.WARNING}jwtcrk: warn: Code execution via kid requires no key, your one will be ignored{Bcolors.ENDC}")
@@ -364,9 +361,8 @@ class Cracker:
             if not os.path.exists(self.path_to_key):
                 print(f"{Bcolors.FAIL}jwtcrk: err: Seems like the file does not exist{Bcolors.ENDC}")
                 sys.exit(2)
-            else:
-                self.file = open(self.path_to_key, 'r')
-                self.key = self.file.read()
+            self.file = open(self.path_to_key, 'r')
+            self.key = self.file.read()
 
     def decode_and_quit(self):
         """
