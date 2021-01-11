@@ -948,7 +948,7 @@ class Cracker:
         """
         if "," in string:
             values = string.split(",")
-            for i in len(values):
+            for i in range(len(values)):
                 if values[i] == "":
                     values.remove(values[i])
             return values
