@@ -542,8 +542,8 @@ class Cracker:
                     header_dict = Cracker.delete_key(header_dict, to_del)
                 elif from_dict == "payload":
                     payload_dict = Cracker.delete_key(payload_dict, to_del)
-        new_header = json.dumps(header_dict).replace(", ", ",").replace(": ", ":")
-        new_payload = json.dumps(payload_dict).replace(", ", ",").replace(": ", ":")
+        new_header = json.dumps(header_dict, separators=(",", ":"))
+        new_payload = json.dumps(payload_dict, separators=(",", ":"))
         return new_header, new_payload
 
     def jku_basic_attack(self, header):
