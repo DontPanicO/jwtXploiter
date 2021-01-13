@@ -71,8 +71,8 @@ class Cracker:
 	"""
 
     man = """
-        python3 jwt-crack.py <token> [options]; OR
-        jwtcrk <token> [options]; IF YOU HAVE USED install.py
+        python3 jwt-crack.py <token> [OPTIONS]; OR
+        jwtcrk <token> [OPTIONS]; IF YOU HAVE USED install.py
 
         Positional:
         token                      [Your JWT.]
@@ -1100,8 +1100,7 @@ if __name__ == '__main__':
     # Add the arguments
     parser.add_argument(
                         "token",
-                        help="Your JWT",
-                        default=sys.stdin if sys.stdin.isatty() else None
+                        help="Your JWT"
                         )
     parser.add_argument("-a", "--alg",
                         help="The algorithm for the attack (None, none, HS256, RS256)",

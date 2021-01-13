@@ -1,6 +1,9 @@
 # jwtCracker
 A tool to test the security of json web token
 
+### Wiki
+Upcoming Wiki - Next Days
+
 ### Installation
 
 - Clone the repo:
@@ -14,6 +17,21 @@ A tool to test the security of json web token
 - Now you can use the script with this syntax:
 
   - jwtcrk <token> [OPTIONS]
+
+### Who this tool is written for?
+
+- Web Application Penetration Tester / Bug Bounty Hunters
+
+  - This tool has been written with the aim of become a key part of pentesters toolkit.
+
+- Devs who need to test the secuirty of JWTs they use in their applications
+
+- CTF Players
+
+- Not For Students
+
+  - Since this tool automates lot of stuff, without force the user to know what's happening under the wood, it won't
+    help you to understand the vulnerabilities it exploits.
 
 ### To Know
 
