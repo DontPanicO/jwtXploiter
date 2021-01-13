@@ -17,7 +17,7 @@ Upcoming Wiki - Next Days
 
 - Now you can use the script with this syntax:
 
-  - jwtcrk \<token\> [OPTIONS]
+  - jwtxpl \<token\> [OPTIONS]
 
 ### Who this tool is written for?
 

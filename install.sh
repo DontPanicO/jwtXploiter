@@ -8,7 +8,7 @@ req_path=$(echo $main_path | cat | sed 's:isntall\.sh:requirements\.txt:')
 config_path=$(echo $main_path | cat | sed 's:install\.sh:config\.py:')
 to_config=$(echo $main_path | cat | sed 's:install\.sh::')
 absolute="$(pwd)/$scriptname"
-bintool="jwtcrk"
+bintool="jwtxpl"
 
 
 echo "cwd = \"$to_config\"" >> $config_path
@@ -24,7 +24,7 @@ if [[ $forall == "" ]]; then
     chmod u+x $tool_path
     pip3 install -r $req_path
     ln -s $tool_path $bindir/$bintool
-    echo "JWT cracker installed successfully. Now you can use jwtcrk <token> [OPTIONS]"
+    echo "JWT cracker installed successfully. Now you can use jwtxpl <token> [OPTIONS]"
 
 
 elif [[ $forall == "all" || $forall == "a" ]]; then
@@ -35,7 +35,7 @@ elif [[ $forall == "all" || $forall == "a" ]]; then
     chmod +x $tool_path
     pip3 install -r $req_path
     sudo ln -s $tool_path /usr/local/bin/$bintool
-    echo "JWT cracker installed successfully. Now you can use jwtcrk <token> [OPTIONS]"
+    echo "JWT cracker installed successfully. Now you can use jwtxpl <token> [OPTIONS]"
 
 
 else
