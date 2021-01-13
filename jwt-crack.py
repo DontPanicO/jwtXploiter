@@ -148,7 +148,7 @@ class Cracker:
         jwtcrk <token> --alg rs256 -p <key>:<value> --jku-redirect https://example.com?redirect=HERE&foo=bar,https://myurl.com
         jwtcrk <token> --alg rs256 -p <key>:<vaue> --add-into header:x5u --x5u-basic http://myurl.com
 
-        Documentation: http://andreatedeschi.uno/jwtCracker/docs/
+        Documentation: Upcoming - Next Days
         """
 
     command = ["jwtcrk"] + [sys.argv[i] for i in range(1, len(sys.argv))]

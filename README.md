@@ -1,5 +1,6 @@
 # jwtCracker
-A tool to test the security of json web token
+A tool to test the security of json web token.
+The tool is in beta, plese open issues when you run into errors.
 
 ### Wiki
 Upcoming Wiki - Next Days
