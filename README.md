@@ -30,7 +30,7 @@ Upcoming Wiki - Next Days
 
 - Not For Students
 
-  - Since this tool automates lot of stuff, without force the user to know what's happening under the wood, it won't
+  - Since this tool automates lot of stuff, without force the user to know what's happening under the hood, it won't
     help you to understand the vulnerabilities it exploits.
 
 ### To Know
