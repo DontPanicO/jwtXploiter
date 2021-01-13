@@ -1,4 +1,4 @@
-# jwtCracker
+# jwtXploiter
 A tool to test the security of json web token.
 The tool is in beta, plese open issues when you run into errors.
 
@@ -9,7 +9,7 @@ Upcoming Wiki - Next Days
 
 - Clone the repo:
 
-  - git clone https://github.com/DontPanicO/jwtCracker.git
+  - git clone https://github.com/DontPanicO/jwtXploiter.git
 
 - Run install.sh:
 
