@@ -24,7 +24,7 @@ Upcoming Wiki - Next Days
 
   - This tool has been written with the aim of become a key part of pentesters toolkit.
 
-- Devs who need to test the secuirty of JWTs they use in their applications
+- Devs who need to test the secuirty of JWTs used in their applications
 
 - CTF Players
 
