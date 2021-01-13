@@ -125,8 +125,7 @@ class Cracker:
            --jku-inbody <mainURL>  [Try to exploit an http header injection to inject the jwks in
                                     the http response of the url. Use the HERE keyword to let the
                                     tool know where to inject the jwks. The tool won't return any
-                                    file since jwks will be injected in the response body.
-                                    '/.well-known/jwks.json' will be appended to you url.]
+                                    file since jwks will be injected in the response body.]
            --x5u-basic <yourURL>   [Same as --jku-basic but with x5u header. The x5u allow to link
                                     an url to a jwks file containing a certificate. The tool will
                                     generate a certificate an will craft a proper jwks file.]
@@ -473,9 +472,6 @@ class Cracker:
             if "HERE" not in self.jku_header_injection:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
                 sys.exit(2)
-            if "," not in self.jku_header_injection:
-                print(f"{Bcolors.FAIL}jwtcrk: err: Missing url. Please pass the vulnerable url and yur one as comma separated values{Bcolors.ENDC}")
-                sys.exit(2)
             body = self.jku_via_header_injection(header_dict)
             content_length = len(body)
             body = Cracker.url_escape(body, "[]{}")
@@ -501,9 +497,6 @@ class Cracker:
                 sys.exit(2)
             if "HERE" not in self.x5u_header_injection:
                 print(f"{Bcolors.FAIL}jwtcrk: err: You have to specify HERE keyword in the place you want to inject{Bcolors.ENDC}")
-                sys.exit(2)
-            if "," not in self.x5u_header_injection:
-                print(f"{Bcolors.FAIL}jwtcrk: err: Missing url. Please pass the vulnerable url and your one as comma separated values{Bcolors.ENDC}")
                 sys.exit(2)
             body = self.x5u_via_header_injection(header_dict)
             content_length = len(body)
@@ -1160,7 +1153,7 @@ if __name__ == '__main__':
                         metavar="<mainURL,yourURL>", required=False
                         )
     parser.add_argument("--jku-inbody",
-                        help="The url vulnerable to HTTP header injection and your one, as comma separated values. Append the HERE keyword to the vulnerable parameter of the url query string. './well-known/jwks.json' is automatically appended to your url",
+                        help="The url vulnerable to HTTP header injection. Append the HERE keyword to the vulnerable parameter of the url query string",
                         metavar="<mainURL>", required=False
                         )
     parser.add_argument("--x5u-basic",
@@ -1168,7 +1161,7 @@ if __name__ == '__main__':
                         metavar="<yourURL>", required=False
                         )
     parser.add_argument("--x5u-inbody",
-                        help="The url vulnerable to HTTP header injection and your one, as comma separated values. Append the HERE keyword to the vulnerable parameter of the url query string './well-known/jwks.json' is automatically appended to your url",
+                        help="The url vulnerable to HTTP header injection. Append the HERE keyword to the vulnerable parameter of the url query string",
                         metavar="<mainURL>", required=False
                         )
     parser.add_argument("--manual", action="store_true",
