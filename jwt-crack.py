@@ -260,29 +260,27 @@ class Cracker:
             sys.exit(2)
         """Validate alg"""
         if self.alg is not None:
-            valid_algs = ["None", "none", "HS256", "hs256", "RS256", "rs256"]
-            if self.alg not in valid_algs:
+            valid_algs = ["none", "hs256", "hs384", "hs512", "rs256", "rs384", "rs512"]
+            if self.alg.lower() not in valid_algs:
                 print(f"{Bcolors.FAIL}jwtxpl: err: Invalid algorithm{Bcolors.ENDC}")
                 sys.exit(2)
-            if self.alg == "hs256":
-                self.alg = "HS256"
-            elif self.alg == "None" or self.alg == "none":
+            if self.alg == "None" or self.alg == "none":
                 if any(self.require_alg_args):
                     print(f"{Bcolors.FAIL}jwtxpl: err: You don't need a key with None/none algorithm{Bcolors.ENDC}")
                     sys.exit(1)
                 print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
-            elif self.alg == "rs256" or self.alg == "RS256":
+            elif self.alg.lower().startswith("rs"):
                 if not any(arg for arg in self.jwks_args):
-                    print(f"{Bcolors.FAIL}jwtxpl: err: RS256 is supported only for jku injection for now{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: RSA is supported only for jku injection for now{Bcolors.ENDC}")
                     sys.exit(1)
-                self.alg = "RS256"
+            self.alg = self.alg.upper()
         """Force self.alg to RS256 for jku attacks"""
         if any(arg for arg in self.jwks_args):
             if len(list(filter(lambda x: x is not None, self.jwks_args))) > 1:
                 print(f"{Bcolors.FAIL}jwtxpl: err: You can't use two jku or x5u injections at the same time{Bcolors.ENDC}")
                 sys.exit(1)
-            if self.alg is not None and self.alg != "RS256":
-                print(f"{Bcolors.WARNING}jwtxpl: warn: With jku/x5u injections, alg will be forced to RS256{Bcolors.ENDC}")
+            if self.alg is not None and not self.alg.startswith("RS"):
+                print(f"{Bcolors.WARNING}jwtxpl: warn: Alg must be RSA with jwks args: it will be force to RS256{Bcolors.ENDC}")
             self.alg = "RS256"
         """--manual can be used only with jku-basic or x5u-basic"""
         if self.manual:
@@ -677,19 +675,20 @@ class Cracker:
         if self.unverified:
             signature = self.token_dict['signature']
         else:
+            sign_alg = Cracker.get_sign_alg(self.alg)
             if self.alg == "None" or self.alg == "none":
                 signature = ""
-            elif self.alg == "HS256":
+            elif self.alg.startswith("HS"):
                 if self.key is None:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with HS256{Bcolors.ENDC}")
                     sys.exit(2)
                 signature = base64.urlsafe_b64encode(
-                    hmac.new(bytes(self.key, "utf-8"), partial_token.encode('utf-8'), hashlib.sha256).digest()
+                    hmac.new(bytes(self.key, "utf-8"), partial_token.encode('utf-8'), sign_alg).digest()
                 ).decode('utf-8').rstrip("=")
-            elif self.alg == "RS256":
+            elif self.alg.startswith("RS"):
                 signature = base64.urlsafe_b64encode(
                     self.key.priv.sign(
-                        bytes(partial_token, encoding='utf-8'), algorithm=hashes.SHA256(), padding=padding.PKCS1v15()
+                        bytes(partial_token, encoding='utf-8'), algorithm=sign_alg, padding=padding.PKCS1v15()
                     )
                 ).decode('utf-8').rstrip("=")
         return signature
@@ -902,6 +901,33 @@ class Cracker:
         encoded_header = Cracker.encode_token_segment(header_)
         encoded_payload = Cracker.encode_token_segment(payload_)
         return encoded_header + "." + encoded_payload
+
+    @staticmethod
+    def get_sign_alg(alg):
+        """
+        :param alg: The user specified alg -> str
+
+        From the token alg string, retrieve the right alg function to be used for the signature
+        :return: The right algorithm method
+        """
+        if alg.startswith("HS"):
+            if alg.endswith("256"):
+                sign_alg = hashlib.sha256
+            elif alg.endswith("384"):
+                sign_alg = hashlib.sha384
+            elif alg.endswith("512"):
+                sign_alg = hashlib.sha512
+        elif alg.startswith("RS"):
+            if alg.endswith("256"):
+                sign_alg = hashes.SHA256()
+            elif alg.endswith("384"):
+                sign_alg = hashes.SHA384()
+            elif alg.endswith("512"):
+                sign_alg = hashes.SHA512()
+        else:
+            return None
+        return sign_alg
+
 
     @staticmethod
     def build_keys(string):
