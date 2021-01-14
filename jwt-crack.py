@@ -407,6 +407,7 @@ class Cracker:
         header_dict = json.loads(self.original_token_header)
         payload_dict = json.loads(self.original_token_payload)
         header_dict['alg'] = self.alg
+        commons_jwks_url_ends = ["jwks.json", "jwks", "keys", ".json"]
         if self.add_into:
             for item in self.add_into:
                 try:
@@ -440,7 +441,7 @@ class Cracker:
             if self.manual:
                 url = self.jku_basic
             else:
-                if self.jku_basic.endswith("jwks.json"):
+                if any(self.jku_basic.endswith(end) for end in commons_jwks_url_ends)
                     print(f"{Bcolors.FAIL}jwtxpl: err: '/.well-known/jwks.json' will automatically be appended to you url. If you need to specify the complete url use --manual{Bcolors.ENDC}")
                     sys.exit(2)
                 url = self.jku_basic.rstrip("/") + "/.well-known/jwks.json"
@@ -456,7 +457,7 @@ class Cracker:
             if "," not in self.jku_redirect:
                 print(f"{Bcolors.FAIL}jwtxpl: err: Missing url. Please pass the vulnerable url and your one as comma separated values{Bcolors.ENDC}")
                 sys.exit(2)
-            if self.jku_redirect.endswith("jwks.json"):
+            if any(self.jku_redirect.endswith(end) for end in commons_jwks_url_ends):
                 print(f"{Bcolors.FAIL}jwtxpl: err: '/.well-known/jwks.json' will automatically be appended to your url. To craft an url by yourself, use --jku-basic with the --manual option{Bcolors.ENDC}")
                 sys.exit(2)
             main_url = self.jku_redirect.split(",")[0]
@@ -483,7 +484,7 @@ class Cracker:
             if self.manual:
                 url = self.x5u_basic
             else:
-                if self.x5u_basic.endswith("jwks.json"):
+                if any(self.x5u_basic.endswith(end) for end in commons_jwks_url_ends):
                     print(f"{Bcolors.FAIL}jwtxpl: err: '/.well-known/jwks.json' will automatically be appended to your url. If you need to specify the complete url please use --manual{Bcolors.ENDC}")
                     sys.exit(2)
                 url = self.x5u_basic.rstrip("/") + "/.well-known/jwks.json"
@@ -908,7 +909,7 @@ class Cracker:
         :param alg: The user specified alg -> str
 
         From the token alg string, retrieve the right alg function to be used for the signature
-        :return: The right algorithm method
+        :return: The right hash method
         """
         if alg.startswith("HS"):
             if alg.endswith("256"):
