@@ -215,7 +215,8 @@ class Cracker:
         self.generate_jwk = generate_jwk
         """Groups args based on requirements"""
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
-        self.require_alg_args = [self.path_to_key, self.auto_try, self.kid, self.specified_key] + self.jwks_args
+        self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key, self.unverified]
+        self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
         """Store a command that need to run in case of x5u injection and open devnull"""
         self.x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/State=Ohio/L=Columbus/O=TestingInc/CN=testing"'
         self.devnull = open(os.devnull, 'wb')
@@ -233,8 +234,8 @@ class Cracker:
         1)Validate the token: Using check_token, looks if the token is valid. If not quits out.
 
         2)Validate alg: If an algorithm has been passed, it checks that's a valid one. If it's None or none it reminds
-        to the user that some libraries accept None and other none. Then does a case sensitive correction if hs256 or rs256
-        has been passed as alg. Last but not least, if any jku/x5u argument is present, it force the alg to be RSA.
+        to the user that some libraries accept None and other none. Then does a case sensitive correction if RS* or HS*
+        has been passed as alg. Last but not least, if any jku/x5u argument is present, it force the alg to be RS*.
         Since the user can not passes more than one jku/x5u related argument, the script look for that and eventually quits.
 
         3)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
@@ -271,12 +272,12 @@ class Cracker:
                 print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
             elif self.alg.lower().startswith("rs"):
                 if not any(arg for arg in self.jwks_args):
-                    print(f"{Bcolors.FAIL}jwtxpl: err: RSA is supported only for jku injection for now{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: RSA is supported only for jwks for now{Bcolors.ENDC}")
                     sys.exit(1)
             self.alg = self.alg.upper()
         """Force self.alg to RS256 for jku attacks"""
         if any(arg for arg in self.jwks_args):
-            if len(list(filter(lambda x: x is not None, self.jwks_args))) > 1:
+            if len(list(filter(lambda x: x is True, self.jwks_args))) > 1:
                 print(f"{Bcolors.FAIL}jwtxpl: err: You can't use two jku or x5u injections at the same time{Bcolors.ENDC}")
                 sys.exit(1)
             if self.alg is not None and not self.alg.startswith("RS"):
@@ -441,7 +442,7 @@ class Cracker:
             if self.manual:
                 url = self.jku_basic
             else:
-                if any(self.jku_basic.endswith(end) for end in commons_jwks_url_ends)
+                if any(self.jku_basic.endswith(end) for end in commons_jwks_url_ends):
                     print(f"{Bcolors.FAIL}jwtxpl: err: '/.well-known/jwks.json' will automatically be appended to you url. If you need to specify the complete url use --manual{Bcolors.ENDC}")
                     sys.exit(2)
                 url = self.jku_basic.rstrip("/") + "/.well-known/jwks.json"
@@ -1205,7 +1206,7 @@ if __name__ == '__main__':
 
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
-        args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.jku_inbody,
+        args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
         args.unverified, args.decode, args.manual, args.generate_jwk,
     )
 
