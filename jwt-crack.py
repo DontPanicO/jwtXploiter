@@ -277,11 +277,11 @@ class Cracker:
             self.alg = self.alg.upper()
         """Force self.alg to RS256 for jku attacks"""
         if any(arg for arg in self.jwks_args):
-            if len(list(filter(lambda x: x is True, self.jwks_args))) > 1:
+            if len(list(filter(lambda x: x, self.jwks_args + [self.path_to_key]))) > 1:
                 print(f"{Bcolors.FAIL}jwtxpl: err: You can't use two jku or x5u injections at the same time{Bcolors.ENDC}")
                 sys.exit(1)
             if self.alg is not None and not self.alg.startswith("RS"):
-                print(f"{Bcolors.WARNING}jwtxpl: warn: Alg must be RSA with jwks args: it will be force to RS256{Bcolors.ENDC}")
+                print(f"{Bcolors.WARNING}jwtxpl: warn: Alg must be RSA with jwks args: it will be forced to RS256{Bcolors.ENDC}")
             self.alg = "RS256"
         """--manual can be used only with jku-basic or x5u-basic"""
         if self.manual:
@@ -289,78 +289,82 @@ class Cracker:
                 print(f"{Bcolors.FAIL}jwtxpl: err: You can use --manual only with jku/x5u basic injections{Bcolors.ENDC}")
                 sys.exit(1)
         """Validate key"""
-        if any(arg for arg in self.jwks_args):
-            other_key_related_args = [self.path_to_key, self.auto_try, self.kid, self.exec_via_kid, self.specified_key]
-            """With jku, you can't use other key related args"""
-            if any(arg is not None for arg in other_key_related_args) or self.unverified:
-                print(f"{Bcolors.FAIL}jwtxpl: err: You can't pass any key related arg with jku attacks{Bcolors.ENDC}")
-                sys.exit(2)
-            if not self.x5u_basic and not self.x5u_header_injection:
-                """No x5u related argument has been passed"""
-                """Generate a key with OpenSSL"""
-                key = OpenSSL.crypto.PKey()
-                key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
-                self.key = key
-            else:
-                """An x5u related argument has been passed"""
-                subprocess.run(self.x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull)
-                """Read the key from private.pem"""
-                key_file = open("key.pem", 'r')
-                key_read = key_file.read()
-                key_file.close()
-                key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, key_read)
-                self.key = key
-            """The key is converted in a cryptography.hazmat.backends.openssl.rsa._RSAPrivateKey object"""
-            self.key.priv = key.to_cryptography_key()
-            """Same but _RSAPublicKey object"""
-            self.key.pub = self.key.priv.public_key()
-            """Extract modulus and exponent"""
-            self.key.pub.e = self.key.pub.public_numbers().e
-            self.key.pub.n = self.key.pub.public_numbers().n
-        if self.auto_try is not None:
-            other_key_related_args = [self.path_to_key, self.kid, self.exec_via_kid, self.specified_key]
-            if any(arg is not None for arg in other_key_related_arg) or self.unverififed:
-                print(f"{Bcolors.FAIL}jwtxpl: err: --auto-try retrieves the key from ssl certs. Do not pass any other key related arg{Bcolors.ENDC}")
-                sys.exit(2)
-            if self.exec_via_kid is not None:
-                print(f"{Bcolors.FAIL}jwtxpl: err: Code execution via kid needs no key. --autotry can't be ignored{Bcolors.ENDC}")
-            path = Cracker.get_key_from_ssl_cert(self.auto_try)
-            self.path_to_key = path
-        elif self.kid is not None:
-            if self.exec_via_kid is not None:
-                print(f"{Bcolors.FAIL}jwtxpl: err: You can't run two different kid injections at once{Bcolors.ENDC}")
-                sys.exit(2)
-            if self.path_to_key is not None or self.specified_key is not None or self.unverified:
-                print(f"{Bcolors.FAIL}jwtxpl: err: You don't need to specify a key for kid injections{Bcolors.ENDC}")
-                sys.exit(2)
-            if self.kid.lower() == "dirtrv":
-                self.kid = "DirTrv"
-                self.key = ""
-            elif self.kid.lower() == "sqli":
-                self.kid = "SQLi"
-                self.key = "zzz"
-            elif self.kid.lower() == "rce":
-                self.kid = "RCE"
-                """Command will be executed before the server validates the signature"""
-                self.key = "itdoesnotmatter"
-            else:
-                print(f"{Bcolors.FAIL}jwtxpl: err: Invalid --inject-kid. Please select a valid one{Bcolors.ENDC}")
-                sys.exit(2)
-        elif self.exec_via_kid is not None:
-            if self.path_to_key is not None or self.specified_key is not None:
-                print(f"{Bcolors.WARNING}jwtxpl: warn: Code execution via kid requires no key, your one will be ignored{Bcolors.ENDC}")
-            self.key = "itdoesnotmatter"
-        elif self.specified_key is not None:
-            if self.path_to_key is not None:
-                print(f"{Bcolors.FAIL}jwtxpl: err: You have passed two keys with --specify and --key{Bcolors.ENDC}")
-                sys.exit(2)
-            self.key = self.specified_key
-        if self.path_to_key is not None:
-            if not os.path.exists(self.path_to_key):
-                print(f"{Bcolors.FAIL}jwtxpl: err: Seems like the file does not exist{Bcolors.ENDC}")
-                sys.exit(2)
-            self.file = open(self.path_to_key, 'r')
-            self.key = self.file.read()
+        if not self.decode:
+            if self.alg[:2] == "RS":
+                """Check for conflicts"""
+                if any(self.cant_asymmetric_args):
+                    print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with RS* alg{Bcolors.ENDC}")
+                    sys.exit(2)
+                elif not any(self.jwks_args + [self.path_to_key]):
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Missing an arg for the key{Bcolors.ENDC}")
+                    sys.exit(2)
+                elif len(list(filter(lambda x: x, self.jwks_args + [self.path_to_key]))) > 1:
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related arg {Bcolors.ENDC}")
+                    sys.exit(2)
+                """No argument conflict"""
+                read_key = [self.path_to_key, self.x5u_basic, self.x5u_header_injection]
+                if not any(read_key):
+                    """We have no key file to read from"""
+                    key = OpenSSL.crypto.PKey()
+                    key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
+                    self.key = key
+                else:
+                    """We have a key file to read from"""
+                    if self.x5u_basic or self.x5u_header_injection:
+                        subprocess.run(self.x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull)
+                        self.path_to_key = "key.pem"
+                    """Read the key from the file"""
+                    key_file = open(self.path_to_key, 'r')
+                    key_read = key_file.read()
+                    key_file.close()
+                    key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, key_read)
+                    self.key = key
+                """The key is converted in a cryptography.hazmat.backends.openssl.rsa._RSAPrivateKey object"""
+                self.key.priv = key.to_cryptography_key()
+                """Same but _RSAPublicKey object"""
+                self.key.pub = self.key.priv.public_key()
+                """Extrac the n and the e"""
+                self.key.pub.e = self.key.pub.public_numbers().e
+                self.key.pub.n = self.key.pub.public_numbers().n
+            elif self.alg[:2] == "HS":
+                """Check for key conflicts"""
+                if any(self.jwks_args):
+                    print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with HS*{Bcolors.ENDC}")
+                    sys.exit(2)
+                elif not any(self.cant_asymmetric_args + [self.path_to_key]):
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Missing an arg for the key{Bcolors.ENDC}")
+                    sys.exit(2)
+                elif len(list(filter(lambda x: x, self.cant_asymmetric_args + [self.path_to_key]))) > 1:
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related args{Bcolor.ENDC}")
+                    sys.exit(2)
+                if self.auto_try is not None:
+                    path = Cracker.get_key_from_ssl_cert(self.auto_try)
+                    self.path_to_key = path
+                elif self.kid is not None:
+                    if self.kid.lower() == "dirtrv":
+                        self.kid = "DirTrv"
+                        self.key = ""
+                    elif self.kid.lower() == "sqli":
+                        self.kid = "SQLi"
+                        self.key = "zzz"
+                    elif self.kid.lower() == "rce":
+                        self.kid = "RCE"
+                        """Command will be executed before verifing the signature"""
+                        self.key = "itdoesnotmatter"
+                    else:
+                        print(f"{Bcolors.FAIL}jwtxpl: err: Invalid --inject-kid{Bcolors.ENDC}")
+                        sys.exit(2)
+                elif self.exec_via_kid is not None:
+                    self.key = "itdoesnotmatter"
+                elif self.specified_key is not None:
+                    self.key = self.specified_key
+                if self.path_to_key is not None:
+                    if not os.path.exists(self.path_to_key):
+                        print(f"{Bcolors.FAIL}jwtxpl: err: Key file does not exists{Bcolors.ENDC}")
+                        sys.exit(2)
+                    self.file = open(self.path_to_key, 'r')
+                    self.key = self.file.read()
+
 
     def decode_and_quit(self):
         """

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-forall="$1"
+forall=$1
 script_name="jwt-crack.py"
 main_path="$(realpath $0)"
 tool_path=$(echo $main_path | cat | sed 's:install\.sh:jwt-crack\.py:')
