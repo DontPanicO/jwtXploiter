@@ -1,0 +1,15 @@
+==== Generating jwk claims from scratch with x5c ====
+# Until now, generating jwk claims from scratch is possible only with a
+# basic format containing; kty, kid, use, n and e.
+# A feature to generate a jwk claim containing an x5c with or without
+# n and e. In order to do that, we should change the --generate-jwk
+# option, to be a choice option and not a bool flag anymore.
+# For now, options should be; a basic jwk like we already have now,
+# a jwk with x5c but no n and no e and a jwk with x5c, n and e.
+
+
+==== Read jwk and jwks from files ====
+# Until now, jwks can only be generated or they will automatically be
+# downloaded from jku or x5u headers in relative attacks.
+# We should add an option to read jwk and jwks file and insert them in
+# the token header.

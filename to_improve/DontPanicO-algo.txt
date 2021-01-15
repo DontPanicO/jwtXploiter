@@ -1,0 +1,4 @@
+==== Support for other algorithms ====
+# Until now, only RS* and HS* are supported.
+# We should add at least ES* before the tool
+# can be considered in 1.0 version.
