@@ -233,25 +233,27 @@ class Cracker:
 
         1)Validate the token: Using check_token, looks if the token is valid. If not quits out.
 
-        2)Validate alg: If an algorithm has been passed, it checks that's a valid one. If it's None or none it reminds
-        to the user that some libraries accept None and other none. Then does a case sensitive correction if RS* or HS*
-        has been passed as alg. Last but not least, if any jku/x5u argument is present, it force the alg to be RS*.
-        Since the user can not passes more than one jku/x5u related argument, the script look for that and eventually quits.
+        2)Validate alg: If an algorithm has been passed, it checks that's a valid one. If it's None or none, checks that no
+        argument contained in self.require_alg_args, has been passed. Then advises the user that some libraries use none, while
+        others None. Then if an RS* alg has been set by the user, it checks that he's running a proper attack. Finally, set
+        self.alg as uppercase.
 
         3)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
         This validation has to solve lot of possible conflicts, at least giving warnings to the user and giving priority
-        to the right argument. First, if a jku/x5u argument has been passed, the scripts checks that no other key related one
-        has been passed too, and if it quits out. Else it generates a priv pub pair with openssl, or read from a file in case
-        of x5u and extracs the modulus and the esponent. Since now, if any jku/x5u arg has been passed, we know that not other
-        args has, so the validation ends here.
-        If it goes on, it means that we have no jku/x5u arg, so we don't need to check for it later in the function.
-        If a domain name for self.auto_try has been passed, it call get_key_from_ssl_cert and stores it in self.path_to_key.
-        In this check, if we have self.kid, self.specified or self.path_to_key the script quits, cause of the conflict(self.kid
-        uses preset keys). Then it validate self.kid: if self.path_to_key or self.specified has been passed, returns an error
-        and quits. Else goes on and checks that self.kid has a proper value. Then if self.specified has been passed, checks that
-        self.path_to_key has not (at this point we know that other args has not been passed since we have already validated
-        them), and store self.specified value in self.key. Last, if we have self.path_to_key, checks that the path exists and that
-        the algorithm has a proper value. Then read the file and store it in self.key.
+        to the right argument. First, if self.decode is true, all this validation will be skipped, since decoding the token
+        does not need any key, and it will quits immediately after the decoded header and payload have been printed out.
+        Then it checks for conflicts with self.manual. This is not a key related argument, but there was no better ways to
+        place it. If self.alg is RS* it looks for: No argument in self.cant_asymmetric is True; At least one argument in
+        self.jwks_args or self.path_to_key is True; No more than one argument in self.jwks_args or self.path_to_key is True.
+        The it checks if the key pair has to be generated or if we have a key file to start from. The completes the key
+        generation extracting also the modulus and the exponent to be inserted in the jwks file.
+        If self.alg is HS* instead, it looks for: No argument in self.jwks_args is True; At least one argument in
+        self.cant_asymmetric or self.path_to_key is True; No more than one argument in self.cant_asymmetric or self.path_to_key
+        is True. If self.auto_try is True call get_key_from_ssl_cert and store the path to the key file in self.path_to_key.
+        If self.kid is True instead, check that it has a valid value, and set the key-password basing on the payload choice.
+        Same for self.exec_via_kid, where the key does not matter since the code will be executed before the token has been
+        validated. If a key has been specified in self.specified_key stores it in self.key. Last, if self.path_to_key has a
+        value, checks that the path exists and opens the file to read the key from.
 
         """
         """Validate the token"""
@@ -275,7 +277,7 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: err: RSA is supported only for jwks for now{Bcolors.ENDC}")
                     sys.exit(1)
             self.alg = self.alg.upper()
-        """Force self.alg to RS256 for jku attacks"""
+        """Force self.alg to RS256 for jku attacks if a non RSA alg has been selected"""
         if any(arg for arg in self.jwks_args):
             if len(list(filter(lambda x: x, self.jwks_args + [self.path_to_key]))) > 1:
                 print(f"{Bcolors.FAIL}jwtxpl: err: You can't use two jku or x5u injections at the same time{Bcolors.ENDC}")
@@ -283,13 +285,13 @@ class Cracker:
             if self.alg is not None and not self.alg.startswith("RS"):
                 print(f"{Bcolors.WARNING}jwtxpl: warn: Alg must be RSA with jwks args: it will be forced to RS256{Bcolors.ENDC}")
             self.alg = "RS256"
-        """--manual can be used only with jku-basic or x5u-basic"""
-        if self.manual:
-            if not self.jku_basic and not self.x5u_basic:
-                print(f"{Bcolors.FAIL}jwtxpl: err: You can use --manual only with jku/x5u basic injections{Bcolors.ENDC}")
-                sys.exit(1)
         """Validate key"""
         if not self.decode:
+            """--manual can be used only with --jku-basic or --x5u-basic"""
+            if self.manual:
+                if not self.jku_basic and not self.x5u_basic:
+                    print(f"{Bcolors.FAIL}jwtxpl: err: You can use --manual only with jku/x5u basic{Bcolors.ENDC}")
+                    sys.exit(2)
             if self.alg[:2] == "RS":
                 """Check for conflicts"""
                 if any(self.cant_asymmetric_args):
