@@ -983,6 +983,13 @@ class Cracker:
 
     @staticmethod
     def verify_token_with_rsa(key, token, sign_hash):
+        """
+        :param key: The key to use for signature verification -> cryptography.hazmat.backends.openssl.rsa._RSAPublicKey object
+        :param token: A complete JWT -> str
+        :param sign_hash: The hash method to use -> cryptography.hazmat.primitives.hashes method
+
+        :return: False if signature is invalid, True else.
+        """
         partial_token = ".".join(token.split(".")[:2])
         untrusted_signature_to_decode = Cracker.append_equals_if_needed(token.split(".")[2])
         untrusted_signature = base64.urlsafe_b64decode(untrusted_signature_to_decode)
@@ -991,7 +998,28 @@ class Cracker:
         except InvalidSignature:
             return False
         if is_valid_if_none is None:
+            return True
+
+    @staticmethod
+    def gen_pub_key_from_jwk(jwk):
+        """
+        :param jwk: A jwk claim -> dict
+
+        Extrac n and e from the jwk and craft the relative public key
+        :return: The public key.
+        """
+        try:
+            n_64 = jwk['n']
+            e_64 = jwk['e']
+        except KeyError:
             return None
+        n_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(n64))
+        e_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(e64))
+        n = int.from_bytes(n_bytes, byteorder="big")
+        e = int.from_bytes(e_bytes, byteorder="big")
+        cryptography_public_numbers = RSAPublicNumbers(e, n)
+        public_key = cryptography_public_numbers.public_key(backend)
+        return public_key
 
     @staticmethod
     def look_for_valid_key(keys, token, sign_hash, token_alg):
