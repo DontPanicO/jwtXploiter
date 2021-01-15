@@ -38,6 +38,7 @@ try:
     import OpenSSL
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.exceptions import InvalidSignature
 except ModuleNotFoundError:
     print(f"jwtxpl: err: Missing dependecies\nRun ./install.sh or pip3 install -r requirements.txt")
     sys.exit(11)
@@ -780,8 +781,8 @@ class Cracker:
                 return final_text
             except binascii.Error:
                 if i == 2:
-                    print(f"{Bcolors.FAIL}jwtxpl: err: Seems like the token is not base64 encoded or simply invalid{Bcolors.ENDC}")
-                    sys.exit(3)
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Error during token or jwks base64 decoding.{Bcolors.ENDC}")
+                    sys.exit(1)
                 encoded += b'='
                 i += 1
 
@@ -979,6 +980,18 @@ class Cracker:
             return True
         else:
             return False
+
+    @staticmethod
+    def verify_token_with_rsa(key, token, sign_hash):
+        partial_token = ".".join(token.split(".")[:2])
+        untrusted_signature_to_decode = Cracker.append_equals_if_needed(token.split(".")[2])
+        untrusted_signature = base64.urlsafe_b64decode(untrusted_signature_to_decode)
+        try:
+            is_valid_if_none = key.verify(untrusted_signature, partial_token.encode(), padding.PKCS1v15(), sign_hash)
+        except InvalidSignature:
+            return False
+        if is_valid_if_none is None:
+            return None
 
     @staticmethod
     def look_for_valid_key(keys, token, sign_hash, token_alg):
