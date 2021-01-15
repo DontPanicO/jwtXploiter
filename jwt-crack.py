@@ -38,6 +38,8 @@ try:
     import OpenSSL
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
+    from cryptography.hazmat.backends.openssl import backend
     from cryptography.exceptions import InvalidSignature
 except ModuleNotFoundError:
     print(f"jwtxpl: err: Missing dependecies\nRun ./install.sh or pip3 install -r requirements.txt")
