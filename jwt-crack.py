@@ -685,25 +685,19 @@ class Cracker:
         if self.unverified:
             signature = self.token_dict['signature']
         else:
-            sign_alg = Cracker.get_sign_alg(self.alg)
+            sign_hash = Cracker.get_sign_hash(self.alg)
             if self.alg == "None" or self.alg == "none":
                 signature = ""
             elif self.alg.startswith("HS"):
                 if self.key is None:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with HS*{Bcolors.ENDC}")
                     sys.exit(4)
-                signature = base64.urlsafe_b64encode(
-                    hmac.new(bytes(self.key, "utf-8"), partial_token.encode('utf-8'), sign_alg).digest()
-                ).decode('utf-8').rstrip("=")
+                signature = Cracker.sign_token_with_hmac(self.key, partial_token, sign_hash)
             elif self.alg.startswith("RS"):
                 if self.key is None:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with RS*{Bcolors.ENDC}")
                     sys.exit(4)
-                signature = base64.urlsafe_b64encode(
-                    self.key.priv.sign(
-                        bytes(partial_token, encoding='utf-8'), algorithm=sign_alg, padding=padding.PKCS1v15()
-                    )
-                ).decode('utf-8').rstrip("=")
+                signature = Cracker.sign_token_with_rsa(self.key.priv, partial_token, sign_hash)
         return signature
 
     @staticmethod
@@ -917,7 +911,7 @@ class Cracker:
         return encoded_header + "." + encoded_payload
 
     @staticmethod
-    def get_sign_alg(alg):
+    def get_sign_hash(alg):
         """
         :param alg: The user specified alg -> str
 
@@ -926,22 +920,86 @@ class Cracker:
         """
         if alg.startswith("HS"):
             if alg.endswith("256"):
-                sign_alg = hashlib.sha256
+                sign_hash = hashlib.sha256
             elif alg.endswith("384"):
-                sign_alg = hashlib.sha384
+                sign_hash = hashlib.sha384
             elif alg.endswith("512"):
-                sign_alg = hashlib.sha512
+                sign_hash = hashlib.sha512
         elif alg.startswith("RS"):
             if alg.endswith("256"):
-                sign_alg = hashes.SHA256()
+                sign_hash = hashes.SHA256()
             elif alg.endswith("384"):
-                sign_alg = hashes.SHA384()
+                sign_hash = hashes.SHA384()
             elif alg.endswith("512"):
-                sign_alg = hashes.SHA512()
+                sign_hash = hashes.SHA512()
         else:
             return None
-        return sign_alg
+        return sign_hash
 
+    @staticmethod
+    def sign_token_with_hmac(key, partial_token, sign_hash):
+        """
+        :param key: The key used to sign the token -> str
+        :param partial_token: A JWT without the signature -> str
+        :param sign_hash: The hash method to use -> hashlib method
+
+        :return: The generated signature
+        """
+        signature = base64.urlsafe_b64encode(hmac.new(key.encode(), partial_token.encode(), sign_hash).digest()).decode().rstrip("=")
+        return signature
+
+    @staticmethod
+    def sign_token_with_rsa(key, partial_token, sign_hash):
+        """
+        :param key: The private key -> cryptography.hazmat.backends.openssl.rsa._RSAPrivateKey object
+        :param partial_token: A JWT without the signature -> str
+        :param sign_hash: The hash method to use -> cryptography.hazmat.primitives.hashes method
+
+        :return: The generated signature
+        """
+        signature = base64.urlsafe_b64encode(
+            key.sign(partial_token.encode(), algorithm=sign_hash, padding=padding.PKCS1v15())
+        ).decode().rstrip("=")
+        return signature
+
+    @staticmethod
+    def verify_token_with_hmac(key, token, sign_hash):
+        """
+        :param key: The key to use for signature generation -> str
+        :param token: A complete JWT -> str
+        :param sign_hash The hash method to use -> hashlib method
+
+        Generates a signature using key and checks if it differs from the JWT one
+        :return: True, if signatures do not differ, else False. None if token_alg is not valid
+        """
+        untrusted_signature = token.split(".")[2]
+        partial_token = ".".join(token.split(".")[:2])
+        our_signature = Cracker.sign_token_with_hmac(key, partial_token, sign_hash)
+        if our_signature == untrusted_signature:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def look_for_valid_key(keys, token, sign_hash, token_alg):
+        """
+        STAGING!!!!!!!!!!!!!!
+        :param keys: A list of keys -> list
+        :param token: A JWT -> str
+        :param sign_hash: The hash method -> hashlib or cryptography.hazmat.primitives.hashes method
+        :param token_alg: The JWT alg -> str
+
+        Given a list of keys try to sign the token with all keys to check if any is a valid one.
+        :return: The key index if any matches else None.
+        """
+        i = 0
+        for key in keys:
+            if token_alg[:2] == "HS":
+                is_valid_key = Cracker.verify_token_with_hmac(key, token, sign_hash, token_alg)
+            if is_valid_key:
+                return i
+            i += 1
+        return None
 
     @staticmethod
     def build_keys(string):
