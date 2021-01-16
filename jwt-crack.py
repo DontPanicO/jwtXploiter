@@ -168,8 +168,8 @@ class Cracker:
         """
 
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
-                 specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, unverified=False, decode=False,
-                 manual=False, generate_jwk=False):
+                 specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
+                 unverified=False, decode=False, manual=False, generate_jwk=False):
         """
         :param token: The user input token -> str.
         :param alg: The algorithm for the attack. HS256 or None -> str.
@@ -217,6 +217,7 @@ class Cracker:
         self.jku_header_injection = jku_header_injection
         self.x5u_basic = x5u_basic
         self.x5u_header_injection = x5u_header_injection
+        self.verify_token_with = verify_token_with
         self.unverified = unverified
         self.decode = decode
         self.manual = manual
@@ -281,7 +282,7 @@ class Cracker:
                     sys.exit(2)
                 print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
             elif self.alg.lower().startswith("rs"):
-                if not any(arg for arg in self.jwks_args):
+                if not any(arg for arg in self.jwks_args + [self.verify_token_with]):
                     print(f"{Bcolors.FAIL}jwtxpl: err: RSA is supported only for jwks for now{Bcolors.ENDC}")
                     sys.exit(4)
             self.alg = self.alg.upper()
@@ -291,7 +292,7 @@ class Cracker:
                 print(f"{Bcolors.WARNING}jwtxpl: warn: Alg must be RSA with jwks args: it will be forced to RS256{Bcolors.ENDC}")
             self.alg = "RS256"
         """Validate key"""
-        if not self.decode:
+        if not self.decode and not self.verify_token_with:
             """--manual can be used only with --jku-basic or --x5u-basic"""
             if self.manual:
                 if not self.jku_basic and not self.x5u_basic:
@@ -367,7 +368,7 @@ class Cracker:
                     self.key = self.specified_key
                 if self.path_to_key is not None:
                     if not os.path.exists(self.path_to_key):
-                        print(f"{Bcolors.FAIL}jwtxpl: err: Key file does not exists{Bcolors.ENDC}")
+                        print(f"{Bcolors.FAIL}jwtxpl: err: No such file {self.path_to_key}{Bcolors.ENDC}")
                         sys.exit(7)
                     self.file = open(self.path_to_key, 'r')
                     self.key = self.file.read()
@@ -388,7 +389,7 @@ class Cracker:
                       self.auto_try, self.kid, self.specified_key,
                       self.jku_basic, self.jku_redirect, self.jku_header_injection,
                       self.remove_from, self.x5u_basic, self.x5u_header_injection,
-                      self.add_into, self.exec_via_kid,
+                      self.add_into, self.exec_via_kid, self.verify_token_with
         ]
         if any(arg is not None for arg in other_args) or self.unverified or self.manual or self.generate_jwk:
             print(f"{Bcolors.WARNING}jwtxpl: warn: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}")
@@ -400,18 +401,21 @@ class Cracker:
 
     def verify_and_quit(self):
         """
-        STAGING !!!!
-        Intended to be used with a new option -V/--verify-token-with, not implemented yet in the argparse.
+        Read the the key from the path specified at self.verify_token_with and try to verify the token with it.
+        Then prints to stdout the result and quits.
         """
+        if not os.path.exists(self.verify_token_with):
+            print(f"{Bcolors.FAIL}jwtxpl: err: No such file {self.verify_token_with}{Bcolors.ENDC}")
+            sys.exit(7)
         sign_hash = Cracker.get_sign_hash(self.alg)
         if self.alg[:2] == "RS":
-            key = Cracker.read_public_key("self.verify_token_with")
+            key = Cracker.read_public_key(self.verify_token_with)
             verified = Cracker.verify_token_with_rsa(key, self.token, sign_hash)
         elif self.alg[:2] == "HS":
-            with open("self.verify_token_with", 'r') as file:
+            with open(self.verify_token_with, 'r') as file:
                 key = file.read()
             verified = Cracker.verify_token_with_hmac(key, self.token, sign_hash)
-        result = "Verified with {self.verify_token_with}" if verified else "Unverified with {self.verify_token_with}"
+        result = f"Verified with {self.verify_token_with}" if verified else f"Unverified with {self.verify_token_with}"
         print(f"{Bcolors.HEADER}Token:{Bcolors.ENDC} {Bcolors.OKCYAN}{result}{Bcolors.ENDC}")
         sys.exit(0)
 
@@ -1234,6 +1238,8 @@ class Cracker:
         if self.alg is None:
             print(f"{Bcolors.FAIL}jwtxpl: err: Missing --alg. You can mess it up only if you are decoding a jwt{Bcolors.ENDC}")
             sys.exit(4)
+        if self.verify_token_with is not None:
+            self.verify_and_quit()
         header, payload = self.modify_header_and_payload()
         new_partial_token = Cracker.craft_token(header, payload)
         signature = self.select_signature(new_partial_token)
@@ -1272,7 +1278,7 @@ if __name__ == '__main__':
                         )
     parser.add_argument("-k", "--key",
                         help="The path to the key file",
-                        metavar="<path_to_key>", required=False
+                        metavar="<keyfile>", required=False
                         )
     parser.add_argument("-p", "--payload",
                         action="append", nargs="+",
@@ -1282,6 +1288,10 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--decode", action="store_true",
                         help="Just decode the token and quit",
                         required=False
+                        )
+    parser.add_argument("-V", "--verify-token-with",
+                        help="The key to verify the token with. Verify and exit",
+                        metavar="<keyfile>", required=False
                         )
     parser.add_argument("--complex-payload", action="append", nargs="+",
                         help="As --payload but for subclaims. Keys must be comma separated, and passed in cronological order. If value have to be a list, pass the list items as comma separated values",
@@ -1300,7 +1310,7 @@ if __name__ == '__main__':
                         required=False
                         )
     parser.add_argument("--auto-try",
-                        help="Retrieve public key from the host ssl cert",
+                        help="Retrieve public key from the target ssl cert",
                         metavar="<domain>", required=False
                         )
     parser.add_argument("--inject-kid",
@@ -1350,7 +1360,7 @@ if __name__ == '__main__':
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
-        args.unverified, args.decode, args.manual, args.generate_jwk,
+        args.verify_token_with, args.unverified, args.decode, args.manual, args.generate_jwk,
     )
 
     # Start the cracker
