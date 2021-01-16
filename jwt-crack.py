@@ -304,12 +304,13 @@ class Cracker:
         """
         other_args = [
                       self.alg, self.path_to_key, self.user_payload, self.complex_payload,
-                      self.auto_try, self.kid, self.specified_key,
-                      self.jku_basic, self.jku_redirect, self.jku_header_injection,
-                      self.remove_from, self.x5u_basic, self.x5u_header_injection,
-                      self.add_into, self.exec_via_kid, self.verify_token_with
+                      self.remove_from, self.add_into, self.auto_try, self.kid,
+                      self.exec_via_kid, self.specified_key, self.jku_basic,
+                      self.jku_redirect, self.jku_header_injection, self.x5u_basic,
+                      self.x5u_header_injection, self.verify_token_with, self.unverified,
+                      self.manual, self.generate_jwk
         ]
-        if any(arg is not None for arg in other_args) or self.unverified or self.manual or self.generate_jwk:
+        if any(arg for arg in other_args):
             print(f"{Bcolors.WARNING}jwtxpl: warn: You have not to specify any other argument if you want to decode the token{Bcolors.ENDC}")
         print(f"{Bcolors.HEADER}Header:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_header}{Bcolors.ENDC}" +
               "\n" +
@@ -325,9 +326,22 @@ class Cracker:
         if not os.path.exists(self.verify_token_with):
             print(f"{Bcolors.FAIL}jwtxpl: err: No such file {self.verify_token_with}{Bcolors.ENDC}")
             sys.exit(7)
+        other_args = [
+                      self.path_to_key, self.user_payload, self.complex_payload,
+                      self.remove_from, self.add_into, self.auto_try, self.kid,
+                      self.exec_via_kid, self.specified_key, self.jku_basic,
+                      self.jku_redirect, self.jku_header_injection, self.x5u_basic,
+                      self.x5u_header_injection, self.unverified, self.decode, self.manual,
+                      self.generate_jwk
+        ]
+        if any(arg for arg in other_args):
+            print(f"{Bcolors.WARNING}jwtxpl: warn: Only the alg is required to verify the signature{Bcolors.ENDC}")
         sign_hash = Cracker.get_sign_hash(self.alg)
         if self.alg[:2] == "RS":
             key = Cracker.read_public_key(self.verify_token_with)
+            if key is None:
+                print(f"{Bcolors.FAIL}jwtxpl: err: Key file is not PEM format{Bcolors.ENDC}")
+                sys.exit(6)
             verified = Cracker.verify_token_with_rsa(key, self.token, sign_hash)
         elif self.alg[:2] == "HS":
             with open(self.verify_token_with, 'r') as file:
@@ -987,7 +1001,10 @@ class Cracker:
         :return: The public key object
         """
         with open(path, 'rb') as keyfile:
-            public_key = load_pem_public_key(keyfile.read())
+            try:
+                public_key = load_pem_public_key(keyfile.read())
+            except ValueError:
+                return None
         return public_key
 
     @staticmethod
