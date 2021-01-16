@@ -1003,7 +1003,7 @@ class Cracker:
             return True
 
     @staticmethod
-    def gen_pub_key_from_jwk(jwk):
+    def gen_public_key_from_jwk(jwk):
         """
         :param jwk: A jwk claim -> dict
 
@@ -1024,22 +1024,21 @@ class Cracker:
         return public_key
 
     @staticmethod
-    def look_for_valid_key(keys, token, sign_hash, token_alg):
+    def find_verifier_key_from_jwks(token, jwks_dict, sign_hash):
         """
-        STAGING!!!!!!!!!!!!!!
-        :param keys: A list of keys -> list
-        :param token: A JWT -> str
-        :param sign_hash: The hash method -> hashlib or cryptography.hazmat.primitives.hashes method
-        :param token_alg: The JWT alg -> str
+        :param token: A complete JWT -> str
+        :param jwks_dict: The content of a jwks file loaded with json -> dict
+        :param sign_hash: The hash for verification -> cryptography.hazmat.primitives.hashes method
 
-        Given a list of keys try to sign the token with all keys to check if any is a valid one.
-        :return: The key index if any matches else None.
+        Given a jwks object, for all jwk it contains, generate the public key and try to verify the token
+        with it. If the verification is successfull, it breaks the loop.
+        :return: The jwk object index or None if no keys can verify the token
         """
         i = 0
-        for key in keys:
-            if token_alg[:2] == "HS":
-                is_valid_key = Cracker.verify_token_with_hmac(key, token, sign_hash, token_alg)
-            if is_valid_key:
+        for jwk in jwks_dict['keys']:
+            public_key = Cracker.gen_public_key_from_jwk(jwk)
+            is_this_key = Cracker.verify_token_with_rsa(public_key, token, sign_hash)
+            if is_this_key:
                 return i
             i += 1
         return None
@@ -1176,6 +1175,7 @@ class Cracker:
         jwk['use'] = "sig"
         jwk['n'] = n
         jwk['e'] = e
+        jwk['alg'] = "RS256"
         return jwk
 
     @staticmethod
