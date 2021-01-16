@@ -38,6 +38,7 @@ try:
     import OpenSSL
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives.serialization import load_pem_public_key
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
     from cryptography.hazmat.backends.openssl import backend
     from cryptography.exceptions import InvalidSignature
@@ -395,6 +396,23 @@ class Cracker:
               "\n" +
               f"{Bcolors.HEADER}Payload:{Bcolors.ENDC} {Bcolors.OKCYAN}{self.original_token_payload}{Bcolors.ENDC}"
               )
+        sys.exit(0)
+
+    def verify_and_quit(self):
+        """
+        STAGING !!!!
+        Intended to be used with a new option -V/--verify-token-with, not implemented yet in the argparse.
+        """
+        sign_hash = Cracker.get_sign_hash(self.alg)
+        if self.alg[:2] == "RS":
+            key = Cracker.read_public_key("self.verify_token_with")
+            verified = Cracker.verify_token_with_rsa(key, self.token, sign_hash)
+        elif self.alg[:2] == "HS":
+            with open("self.verify_token_with", 'r') as file:
+                key = file.read()
+            verified = Cracker.verify_token_with_hmac(key, self.token, sign_hash)
+        result = "Verified with {self.verify_token_with}" if verified else "Unverified with {self.verify_token_with}"
+        print(f"{Bcolors.HEADER}Token:{Bcolors.ENDC} {Bcolors.OKCYAN}{result}{Bcolors.ENDC}")
         sys.exit(0)
 
     def modify_header_and_payload(self):
@@ -1001,6 +1019,18 @@ class Cracker:
             return False
         if is_valid_if_none is None:
             return True
+
+    @staticmethod
+    def read_public_key(path):
+        """
+        :param path: The path to the pem public key -> str
+
+        Read the key file and generates a cryptography public key from it
+        :return: The public key object
+        """
+        with open(path, 'rb') as keyfile:
+            public_key = load_pem_public_key(keyfile.read())
+        return public_key
 
     @staticmethod
     def gen_public_key_from_jwk(jwk):
