@@ -505,16 +505,25 @@ class Cracker:
                 break
         else:
             filename = header['jku'].split("/")[-1] if header['jku'].split("/")[-1].endswith(".json") else header['jku'].split("/")[-2]
-        jwks_original_file = open(filename)
-        jwks_dict = json.load(jwks_original_file)
-        jwks_dict['keys'][0]['e'] = base64.urlsafe_b64encode(
-            (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
-        ).decode('utf-8').rstrip("=")
-        jwks_dict['keys'][0]['n'] = base64.urlsafe_b64encode(
-            (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
-        ).decode('utf-8').rstrip("=")
+        with open(filename) as jwks_orig_file:
+            jwks_dict = json.load(jwks_orig_file)
+        if len(jwks_dict['keys']) == 1:
+            index = 0
+        else:
+            sign_hash = Cracker.get_sign_hash(self.alg)
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash)
+        try:
+            jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
+                (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
+            ).decode('utf-8').rstrip("=")
+            jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
+                (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
+            ).decode('utf-8').rstrip("=")
+        except (TypeError, IndexError):
+            print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
+            sys.exit(1)
         file = open(f"{cwd}crafted/jwks.json", 'w')
-        file.write(json.dumps(jwks_dict))
+        file.write(json.dumps(jwks_dict, indent=4))
         file.close()
         os.remove(filename)
 
@@ -538,14 +547,23 @@ class Cracker:
                 break
         else:
             filename = header['jku'].split("/")[-1] if header['jku'].split("/")[-1].endswith(".json") else header['jku'].split("/")[-2]
-        jwks_original_file = open(filename)
-        jwks_dict = json.load(jwks_original_file)
-        jwks_dict['keys'][0]['e'] = base64.urlsafe_b64encode(
-            (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
-        ).decode('utf-8').rstrip("=")
-        jwks_dict['keys'][0]['n'] = base64.urlsafe_b64encode(
-            (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
-        ).decode('utf-8').rstrip("=")
+        with open(filename) as jwks_orig_file:
+            jwks_dict = json.load(jwks_orig_file)
+        if len(jwks_dict['keys']) == 1:
+            index = 0
+        else:
+            sign_hash = Cracker.get_sign_hash(self.alg)
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash)
+        try:
+            jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
+                (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
+            ).decode('utf-8').rstrip("=")
+            jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
+                (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
+            ).decode('utf-8').rstrip("=")
+        except (TypeError, IndexError):
+            print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
+            sys.exit(1)
         body = json.dumps(jwks_dict)
         os.remove(filename)
         return body
@@ -573,11 +591,20 @@ class Cracker:
             filename = header['x5u'].split("/")[-1] if header['x5u'].split("/")[-1].endswith(".json") else header['x5u'].split("/")[-2]
         with open("testing.crt", 'r') as cert_file:
             x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
-        jwks_original_file = open(filename)
-        jwks_dict = json.load(jwks_original_file)
-        jwks_dict['keys'][0]['x5c'] = x5c_
+        with open(filename) as jwks_orig_file:
+            jwks_dict = json.load(jwks_orig_file)
+        if len(jwks_dict['keys']) == 1:
+            index = 0
+        else:
+            sign_hash = Cracker.get_sign_hash(self.alg)
+            index = Cracker.find_verifier_key_from_jwk(self.token, jwks_dict, sign_hash)
+        try:
+            jwks_dict['keys'][index]['x5c'] = x5c_
+        except (TypeError, IndexError):
+            print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
+            sys.exit(1)
         file = open("{cwd}crafted/jwks.json", 'w')
-        file.write(json.dumps(jwks_dict))
+        file.write(json.dumps(jwks_dict, indent=4))
         file.close()
         os.remove(filename)
 
@@ -604,9 +631,18 @@ class Cracker:
             filename = header['x5u'].split("/")[-1] if header['x5u'].split("/")[-1].endswith(".json") else header['x5u'].split("/")[-2]
         with open("testing.crt", 'r') as cert_file:
             x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
-        jwks_original_file = open(filename)
-        jwks_dict = json.load(jwks_original_file)
-        jwks_dict['keys'][0]['x5c'] = x5c_
+        with open(filename) as jwks_orig_file:
+            jwks_dict = json.load(jwks_orig_file)
+        if len(jwks_dict['keys']) == 1:
+            index = 0
+        else:
+            sign_hash = Cracker.get_sign_hash(self.alg)
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash)
+        try:
+            jwks_dict['keys'][index]['x5c'] = x5c_
+        except (TypeError, IndexError):
+            print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
+            sys.exit(1)
         body = json.dumps(jwks_dict)
         os.remove(filename)
         return body
