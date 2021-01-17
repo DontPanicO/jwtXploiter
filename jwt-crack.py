@@ -89,26 +89,27 @@ class Cracker:
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
                  unverified=False, decode=False, manual=False, generate_jwk=False):
         """
-        :param token: The user input token -> str.
-        :param alg: The algorithm for the attack. HS256 or None -> str.
-        :param path_to_key: The path to the public.pem, if the alg is HS256 -> str.
-        :param user_payload: What the user want to change in the payload -> list.
+        :param token: The user input token -> str
+        :param alg: The algorithm for the attack. HS256 or None -> str
+        :param path_to_key: A file to load the key from -> str
+        :param user_payload: What the user want to change in the payload -> list
         :param complex_payload: A string (key:value) containing key separated by , to access subclaims -> str
-        :param remove_from: What the user want to delete in the header or in the payload -> list.
-        :param add_into: What the user want to add in the header (useless in the payload) -> list.
-        :param auto_try: The domain from which the script try to retrieve a key via openssl -> str.
-        :param kid: The type of payload to inject in the kid header. DirTrv, SQLi or RCE -> str.
-        :param exec_via_kid: A command to append in the kid header -> str.
-        :param specified_key: A string set to be used as key -> str.
-        :param jku_basic: The main url on which the user want to host the malformed jwks file -> str.
-        :param jku_redirect: Comma separated server url and the user one -> str.
+        :param remove_from: What the user want to delete in the header or in the payload -> list
+        :param add_into: What the user want to add in the header (useless in the payload) -> list
+        :param auto_try: The domain from which the script try to retrieve a key via openssl -> str
+        :param kid: The type of payload to inject in the kid header. DirTrv, SQLi or RCE -> str
+        :param exec_via_kid: A command to append in the kid header -> str
+        :param specified_key: A string set to be used as key -> str
+        :param jku_basic: The main url on which the user want to host the malformed jwks file -> str
+        :param jku_redirect: Comma separated server url and the user one -> str
         :param jku_header_injection: The server url vulnerable to HTTP header injection -> str
-        :param x5u_basic: The main url on which the user want to host the malformed jwks file -> str.
-        :param x5u_header_injection: The server url vulnerable to HTTP header injection -> str.
-        :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool.
-        :param decode: A flag to set if the user need only to decode the token -> Bool.
-        :param manual: A flag to set if the user need to craft an url manually -> Bool.
-        :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> Bool.
+        :param x5u_basic: The main url on which the user want to host the malformed jwks file -> str
+        :param x5u_header_injection: The server url vulnerable to HTTP header injection -> str
+        :param verify_token_with: The file of the public key to be used for verification -> str
+        :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool
+        :param decode: A flag to set if the user need only to decode the token -> Bool
+        :param manual: A flag to set if the user need to craft an url manually -> Bool
+        :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> Bool
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
@@ -222,7 +223,7 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: err: You can use --manual only with jku/x5u basic{Bcolors.ENDC}")
                     sys.exit(4)
             if self.alg[:2] == "RS" or self.alg[:2] == "PS":
-                """Check for conflicts"""
+                """Check for key conflicts"""
                 if any(self.cant_asymmetric_args):
                     print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with RS* alg{Bcolors.ENDC}")
                     sys.exit(2)
@@ -260,6 +261,37 @@ class Cracker:
             elif self.alg[:2] == "ES":
                 print("jwtxpl: ES* support is under developement and not implemented yet")
                 sys.exit(1)
+                """Check for key conflicts"""
+                if any(self.cant_asymmetric_args):
+                    print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with ES*{Bcolors.ENDC}")
+                    sys.exit(2)
+                elif not any(self.jwks_args + [self.path_to_key, self.unverified]):
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Missing an arg for the key{Bcolors.ENDC}")
+                    sys.exit(4)
+                elif len(list(filter(lambda x: x, self.cant_asymmetric_args + [self.path_to_key, self.unverified]))) > 1:
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related argument{Bcolors.ENDC}")
+                    sys.exit(2)
+                """No argument conflict"""
+                read_key = [self.path_to_key, self.x5u_basic, self.x5u_header_injection]
+                if not any(read_key):
+                    """We have no key file to read from"""
+                    if self.alg[-3:] == "256":
+                        self.key = ec.generate_private_key(ec.SECP256R1())
+                    elif self.alg[-3:] == "384":
+                        self.key = ec.generate_private_key(ec.SECP384R1())
+                    elif self.alg[-3:] == "512":
+                        self.key = ec.generate_private_key(ec.SECP521R1())
+                else:
+                    """We have a key file to read from"""
+                    if self.x5u_basic or self.x5u_header_injection:
+                        #DEFINE OPENSSL COMMAND FOR CERT GEN WITH EC KEY
+                        pass
+                    with open(self.path_to_key, 'rb') as keyfile:
+                        self.key = load_pem_private_key(keyfile.read(), password=None)
+                    "Extract the public key and public numbers"
+                    self.key.pub = self.key.public_key()
+                    self.key.pub.x = self.key.public_numbers().x
+                    self.key.pub.y = self.key.public_numbers().y
             elif self.alg[:2] == "HS":
                 """Check for key conflicts"""
                 if any(self.jwks_args):
@@ -271,6 +303,7 @@ class Cracker:
                 elif len(list(filter(lambda x: x, self.cant_asymmetric_args + [self.path_to_key, self.unverified]))) > 1:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related args{Bcolor.ENDC}")
                     sys.exit(2)
+                """No argument conflict"""
                 if self.auto_try is not None:
                     path = Cracker.get_key_from_ssl_cert(self.auto_try)
                     self.path_to_key = path
