@@ -200,7 +200,7 @@ class Cracker:
                     sys.exit(2)
                 print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
             elif self.alg.lower().startswith("rs") or self.alg.lower().startswith("ps"):
-                if not any(arg for arg in self.jwks_args + [self.verify_token_with]):
+                if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with]):
                     print(f"{Bcolors.FAIL}jwtxpl: err: RSA is supported only for jwks for now{Bcolors.ENDC}")
                     sys.exit(4)
             self.alg = self.alg.upper()
@@ -531,7 +531,7 @@ class Cracker:
             index = 0
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
-            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash)
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg[:2])
         try:
             jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
                 (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
@@ -573,7 +573,7 @@ class Cracker:
             index = 0
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
-            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash)
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg[:2])
         try:
             jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
                 (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
@@ -617,7 +617,7 @@ class Cracker:
             index = 0
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
-            index = Cracker.find_verifier_key_from_jwk(self.token, jwks_dict, sign_hash)
+            index = Cracker.find_verifier_key_from_jwk(self.token, jwks_dict, sign_hash, jwa=self.alg[:2])
         try:
             jwks_dict['keys'][index]['x5c'] = x5c_
         except (TypeError, IndexError):
@@ -657,7 +657,7 @@ class Cracker:
             index = 0
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
-            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash)
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg[:2])
         try:
             jwks_dict['keys'][index]['x5c'] = x5c_
         except (TypeError, IndexError):
@@ -803,7 +803,7 @@ class Cracker:
         """
         if " " not in chars and spaces:
             chars += " "
-        encoded = [urllib.parse.quote(char) for char in chars]
+        encoded = [urllib.parse.quote(char).lower() for char in chars]
         for i in range(len(chars)):
             string = string.replace(chars[i], encoded[i])
         return string
