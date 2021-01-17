@@ -37,8 +37,7 @@ import urllib.parse
 try:
     import OpenSSL
     from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric import padding
-    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric import padding, ec
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
     from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
     from cryptography.hazmat.backends.openssl import backend
@@ -143,7 +142,7 @@ class Cracker:
         self.generate_jwk = generate_jwk
         """Groups args based on requirements"""
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
-        self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key, self.unverified]
+        self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key]
         self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
         """Store a command that need to run in case of x5u injection and open devnull"""
         self.x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/State=Ohio/L=Columbus/O=TestingInc/CN=testing"'
@@ -163,8 +162,8 @@ class Cracker:
 
         2)Validate alg: If an algorithm has been passed, it checks that's a valid one. If it's None or none, checks that no
         argument contained in self.require_alg_args, has been passed. Then advises the user that some libraries use none, while
-        others None. Then if an RS* alg has been set by the user, it checks that he's running a proper attack. Finally, set
-        self.alg as uppercase.
+        others None. Then if an RSA/ec based alg has been set by the user, it checks that he's running a proper attack. Finally,
+        set self.alg as uppercase.
 
         3)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
         This validation has to solve lot of possible conflicts, at least giving warnings to the user and giving priority
@@ -205,12 +204,12 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: err: You don't need a key with None/none algorithm{Bcolors.ENDC}")
                     sys.exit(2)
                 print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
-            elif self.alg.lower().startswith("rs") or self.alg.lower().startswith("ps"):
-                if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with]):
-                    print(f"{Bcolors.FAIL}jwtxpl: err: RSA is supported only for jwks for now{Bcolors.ENDC}")
+            elif self.alg.lower()[:2] in ["rs", "ps", "ec"]:
+                if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with, self.unverified]):
+                    print(f"{Bcolors.FAIL}jwtxpl: err: RSA/EC is supported only for jwks, verification or simple signing{Bcolors.ENDC}")
                     sys.exit(4)
             self.alg = self.alg.upper()
-        """Force self.alg to RS256 for jku attacks if a non RSA alg has been selected"""
+        """Force self.alg to RS256 for jku attacks if a non RSA/EC alg has been selected"""
         if any(arg for arg in self.jwks_args):
             if self.alg is not None and self.alg[:2] not in ["RS", "PS", "ES"]:
                 print(f"{Bcolors.WARNING}jwtxpl: warn: Alg must be RSA or EC with jwks args: it will be forced to RS256{Bcolors.ENDC}")
@@ -227,10 +226,10 @@ class Cracker:
                 if any(self.cant_asymmetric_args):
                     print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with RS* alg{Bcolors.ENDC}")
                     sys.exit(2)
-                elif not any(self.jwks_args + [self.path_to_key]):
+                elif not any(self.jwks_args + [self.path_to_key, self.unverified]):
                     print(f"{Bcolors.FAIL}jwtxpl: err: Missing an arg for the key{Bcolors.ENDC}")
                     sys.exit(4)
-                elif len(list(filter(lambda x: x, self.jwks_args + [self.path_to_key]))) > 1:
+                elif len(list(filter(lambda x: x, self.jwks_args + [self.path_to_key, self.unverified]))) > 1:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related arg {Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
@@ -266,10 +265,10 @@ class Cracker:
                 if any(self.jwks_args):
                     print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with HS*{Bcolors.ENDC}")
                     sys.exit(2)
-                elif not any(self.cant_asymmetric_args + [self.path_to_key]):
+                elif not any(self.cant_asymmetric_args + [self.path_to_key, self.unverified]):
                     print(f"{Bcolors.FAIL}jwtxpl: err: Missing an arg for the key{Bcolors.ENDC}")
                     sys.exit(4)
-                elif len(list(filter(lambda x: x, self.cant_asymmetric_args + [self.path_to_key]))) > 1:
+                elif len(list(filter(lambda x: x, self.cant_asymmetric_args + [self.path_to_key, self.unverified]))) > 1:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related args{Bcolor.ENDC}")
                     sys.exit(2)
                 if self.auto_try is not None:
