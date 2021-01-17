@@ -1065,11 +1065,12 @@ class Cracker:
         return public_key
 
     @staticmethod
-    def find_verifier_key_from_jwks(token, jwks_dict, sign_hash):
+    def find_verifier_key_from_jwks(token, jwks_dict, sign_hash, jwa="RS"):
         """
         :param token: A complete JWT -> str
         :param jwks_dict: The content of a jwks file loaded with json -> dict
         :param sign_hash: The hash for verification -> cryptography.hazmat.primitives.hashes method
+        :param jwa: The json web algortihm type, usually the first 2 chars of self.alg -> str
 
         Given a jwks object, for all jwk it contains, generate the public key and try to verify the token
         with it. If the verification is successfull, it breaks the loop.
@@ -1078,7 +1079,12 @@ class Cracker:
         i = 0
         for jwk in jwks_dict['keys']:
             public_key = Cracker.gen_public_key_from_jwk(jwk)
-            is_this_key = Cracker.verify_token_with_rsa_pkcs1(public_key, token, sign_hash)
+            if jwa == "RS":
+                is_this_key = Cracker.verify_token_with_rsa_pkcs1(public_key, token, sign_hash)
+            elif jwa == "PS":
+                is_this_key = Cracker.varify_token_with_rsa_pss(public_key, token, sign_hash)
+            else:
+                return None
             if is_this_key:
                 return i
             i += 1
