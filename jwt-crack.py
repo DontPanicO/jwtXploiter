@@ -190,7 +190,7 @@ class Cracker:
             sys.exit(3)
         """Validate alg"""
         if self.alg is not None:
-            valid_algs = ["none", "hs256", "hs384", "hs512", "rs256", "rs384", "rs512"]
+            valid_algs = ["none", "hs256", "hs384", "hs512", "rs256", "rs384", "rs512", "ps256", "ps384", "ps512"]
             if self.alg.lower() not in valid_algs:
                 print(f"{Bcolors.FAIL}jwtxpl: err: Invalid algorithm{Bcolors.ENDC}")
                 sys.exit(6)
@@ -199,14 +199,14 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: err: You don't need a key with None/none algorithm{Bcolors.ENDC}")
                     sys.exit(2)
                 print(f"{Bcolors.OKBLUE}INFO: Some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
-            elif self.alg.lower().startswith("rs"):
+            elif self.alg.lower().startswith("rs") or self.alg.lower().startswith("ps"):
                 if not any(arg for arg in self.jwks_args + [self.verify_token_with]):
                     print(f"{Bcolors.FAIL}jwtxpl: err: RSA is supported only for jwks for now{Bcolors.ENDC}")
                     sys.exit(4)
             self.alg = self.alg.upper()
         """Force self.alg to RS256 for jku attacks if a non RSA alg has been selected"""
         if any(arg for arg in self.jwks_args):
-            if self.alg is not None and not self.alg.startswith("RS"):
+            if self.alg is not None and self.alg[:2] != "RS" and self.alg[:2] != "PS":
                 print(f"{Bcolors.WARNING}jwtxpl: warn: Alg must be RSA with jwks args: it will be forced to RS256{Bcolors.ENDC}")
             self.alg = "RS256"
         """Validate key"""
@@ -216,7 +216,7 @@ class Cracker:
                 if not self.jku_basic and not self.x5u_basic:
                     print(f"{Bcolors.FAIL}jwtxpl: err: You can use --manual only with jku/x5u basic{Bcolors.ENDC}")
                     sys.exit(4)
-            if self.alg[:2] == "RS":
+            if self.alg[:2] == "RS" or self.alg[:2] == "PS":
                 """Check for conflicts"""
                 if any(self.cant_asymmetric_args):
                     print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with RS* alg{Bcolors.ENDC}")
@@ -342,7 +342,13 @@ class Cracker:
             if key is None:
                 print(f"{Bcolors.FAIL}jwtxpl: err: Key file is not PEM format{Bcolors.ENDC}")
                 sys.exit(6)
-            verified = Cracker.verify_token_with_rsa(key, self.token, sign_hash)
+            verified = Cracker.verify_token_with_rsa_pkcs1(key, self.token, sign_hash)
+        elif self.alg[:2] == "PS":
+            key = Cracker.read_public_key(self.verify_token_with)
+            if key is None:
+                print(f"{Bcolors.FAIL}jwtxpl: err: Key file is not PEM format{Bcolors.ENDC}")
+                sys.exit(6)
+            verified = Cracker.verify_token_with_rsa_pss(key, self.token, sign_hash)
         elif self.alg[:2] == "HS":
             with open(self.verify_token_with, 'r') as file:
                 key = file.read()
@@ -690,7 +696,12 @@ class Cracker:
                 if self.key is None:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with RS*{Bcolors.ENDC}")
                     sys.exit(4)
-                signature = Cracker.sign_token_with_rsa(self.key.priv, partial_token, sign_hash)
+                signature = Cracker.sign_token_with_rsa_pkcs1(self.key.priv, partial_token, sign_hash)
+            elif self.alg.startswith("PS"):
+                if self.key is None:
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with PS*{Bcolors.ENDC}")
+                    sys.exit(4)
+                signature = Cracker.sign_token_with_rsa_pss(self.key.priv, partial_token, sign_hash)
         return signature
 
     @staticmethod
@@ -911,14 +922,14 @@ class Cracker:
         From the token alg string, retrieve the right alg function to be used for the signature
         :return: The right hash method
         """
-        if alg.startswith("HS"):
+        if alg[:2] == "HS":
             if alg.endswith("256"):
                 sign_hash = hashlib.sha256
             elif alg.endswith("384"):
                 sign_hash = hashlib.sha384
             elif alg.endswith("512"):
                 sign_hash = hashlib.sha512
-        elif alg.startswith("RS"):
+        elif alg[:2] == "RS" or alg[:2] == "PS":
             if alg.endswith("256"):
                 sign_hash = hashes.SHA256()
             elif alg.endswith("384"):
@@ -942,7 +953,7 @@ class Cracker:
         return signature
 
     @staticmethod
-    def sign_token_with_rsa(key, partial_token, sign_hash):
+    def sign_token_with_rsa_pkcs1(key, partial_token, sign_hash):
         """
         :param key: The private key -> cryptography.hazmat.backends.openssl.rsa._RSAPrivateKey object
         :param partial_token: A JWT without the signature -> str
@@ -952,6 +963,16 @@ class Cracker:
         """
         signature = base64.urlsafe_b64encode(
             key.sign(partial_token.encode(), algorithm=sign_hash, padding=padding.PKCS1v15())
+        ).decode().rstrip("=")
+        return signature
+
+    @staticmethod
+    def sign_token_with_rsa_pss(key, partial_token, sign_hash):
+        """
+        """
+        signature = base64.urlsafe_b64encode(
+            key.sign(partial_token.encode(), algorithm=sign_hash, padding=padding.PSS(
+                mgf=padding.MGF1(sign_hash), salt_length=padding.PSS.MAX_LENGTH))
         ).decode().rstrip("=")
         return signature
 
@@ -974,7 +995,7 @@ class Cracker:
             return False
 
     @staticmethod
-    def verify_token_with_rsa(key, token, sign_hash):
+    def verify_token_with_rsa_pkcs1(key, token, sign_hash):
         """
         :param key: The key to use for signature verification -> cryptography.hazmat.backends.openssl.rsa._RSAPublicKey object
         :param token: A complete JWT -> str
@@ -986,7 +1007,22 @@ class Cracker:
         untrusted_signature_to_decode = Cracker.append_equals_if_needed(token.split(".")[2])
         untrusted_signature = base64.urlsafe_b64decode(untrusted_signature_to_decode)
         try:
-            is_valid_if_none = key.verify(untrusted_signature, partial_token.encode(), padding.PKCS1v15(), sign_hash)
+            is_valid_if_none = key.verify(untrusted_signature, partial_token.encode(), algorithm=sign_hash, padding=padding.PKCS1v15())
+        except InvalidSignature:
+            return False
+        if is_valid_if_none is None:
+            return True
+
+    @staticmethod
+    def verify_token_with_rsa_pss(key, token, sign_hash):
+        partial_token = ".".join(token.split(".")[:2])
+        untrusted_signature_to_decode = Cracker.append_equals_if_needed(token.split(".")[2])
+        untrusted_signature = base64.urlsafe_b64decode(untrusted_signature_to_decode)
+        try:
+            is_valid_if_none = key.verify(
+                untrusted_signature, partial_token.encode(), algorithm=sign_hash,
+                padding=padding.PSS(mgf=padding.MGF1(sign_hash), salt_length=padding.PSS.MAX_LENGTH)
+            )
         except InvalidSignature:
             return False
         if is_valid_if_none is None:
@@ -1042,7 +1078,7 @@ class Cracker:
         i = 0
         for jwk in jwks_dict['keys']:
             public_key = Cracker.gen_public_key_from_jwk(jwk)
-            is_this_key = Cracker.verify_token_with_rsa(public_key, token, sign_hash)
+            is_this_key = Cracker.verify_token_with_rsa_pkcs1(public_key, token, sign_hash)
             if is_this_key:
                 return i
             i += 1
