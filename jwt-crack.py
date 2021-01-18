@@ -244,7 +244,7 @@ class Cracker:
                     """We have a key file to read from"""
                     if self.x5u_basic or self.x5u_header_injection:
                         """Req a new cert and a new key file"""
-                        x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout rsa_jwtxpl_key.pem -x509 -days 365 -out jwtxpl_testing.crt -subj "/C=US/S=Ohio/L=Columbus/O=TestingInc/CN=testing"'
+                        x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/S=Ohio/L=Columbus/O=TestingInc/CN=testing"'
                         try:
                             subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
                         except subprocess.CalledProcessError:
@@ -291,7 +291,7 @@ class Cracker:
                             curve = "secp384r1"
                         elif self.alg[-3:] == "512":
                             curve = "secp521r1"
-                        x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout ec_jwtxpl_key.pem -x509 -days 365 -out jwtxpl_testing.crt'
+                        x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout key.pem -x509 -days 365 -out testing.crt'
                         try:
                             subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
                         except subprocess.CalledProcessError:
@@ -1436,16 +1436,12 @@ class Cracker:
         print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
         if self.file is not None:
             self.file.close()
-        if os.path.exists("rsa_jwtxpl_key.pem"):
-            os.remove("rsa_jwtxpl_key.pem")
-        if os.path.exists("ec_jwtxpl_key.pem"):
-            os.remove("ec_jwtxpl_key.pem")
         if os.path.exists("key.pem"):
             os.remove("key.pem")
         if os.path.exists("cert.pem"):
             os.remove("cert.pem")
-        if os.path.exists("jwtxpl_testing.crt"):
-            os.remove("jwtxpl_testing.crt")
+        if os.path.exists("testing.crt"):
+            os.remove("testing.crt")
         self.devnull.close()
         sys.exit(0)
 
