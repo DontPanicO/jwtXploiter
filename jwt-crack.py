@@ -214,7 +214,7 @@ class Cracker:
         if any(arg for arg in self.jwks_args):
             if self.alg is not None and self.alg[:2] not in ["RS", "PS", "ES"]:
                 print(f"{Bcolors.WARNING}jwtxpl: warn: Alg must be RSA or EC with jwks args: it will be forced to RS256{Bcolors.ENDC}")
-            self.alg = "RS256"
+                self.alg = "RS256"
         """Validate key"""
         if not self.decode and not self.verify_token_with:
             """--manual can be used only with --jku-basic or --x5u-basic"""
