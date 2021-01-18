@@ -35,7 +35,6 @@ import argparse
 import urllib.parse
 
 try:
-    import OpenSSL
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding, rsa, ec
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
@@ -255,7 +254,7 @@ class Cracker:
                 self.key.pub.e = self.key.pub.public_numbers().e
                 self.key.pub.n = self.key.pub.public_numbers().n
             elif self.alg[:2] == "ES":
-                print("{Bcolors.WARNING}jwtxpl: warn: ES* support is under developement. Open issues if you find any{Bcolors.ENDC}")
+                print(f"{Bcolors.WARNING}jwtxpl: warn: ES* support is under developement. Open issues if you find any{Bcolors.ENDC}")
                 """Check for key conflicts"""
                 if any(self.cant_asymmetric_args):
                     print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with ES*{Bcolors.ENDC}")
@@ -291,8 +290,8 @@ class Cracker:
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
                 "Extract the public key and public numbers"
                 self.key.pub = self.key.public_key()
-                self.key.pub.x = self.key.public_numbers().x
-                self.key.pub.y = self.key.public_numbers().y
+                self.key.pub.x = self.key.pub.public_numbers().x
+                self.key.pub.y = self.key.pub.public_numbers().y
             elif self.alg[:2] == "HS":
                 """Check for key conflicts"""
                 if any(self.jwks_args):
