@@ -39,6 +39,7 @@ try:
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding, ec
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
+    from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicNumbers
     from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
     from cryptography.hazmat.backends.openssl import backend
     from cryptography.exceptions import InvalidSignature
@@ -264,8 +265,7 @@ class Cracker:
                 self.key.pub.e = self.key.pub.public_numbers().e
                 self.key.pub.n = self.key.pub.public_numbers().n
             elif self.alg[:2] == "ES":
-                print("jwtxpl: ES* support is under developement and not implemented yet")
-                sys.exit(1)
+                print("{Bcolors.WARNING}jwtxpl: warn: ES* support is under developement. Open issues if you find any{Bcolors.ENDC}")
                 """Check for key conflicts"""
                 if any(self.cant_asymmetric_args):
                     print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with ES*{Bcolors.ENDC}")
@@ -280,12 +280,8 @@ class Cracker:
                 read_key = [self.path_to_key, self.x5u_basic, self.x5u_header_injection]
                 if not any(read_key):
                     """We have no key file to read from"""
-                    if self.alg[-3:] == "256":
-                        self.key = ec.generate_private_key(ec.SECP256R1())
-                    elif self.alg[-3:] == "384":
-                        self.key = ec.generate_private_key(ec.SECP384R1())
-                    elif self.alg[-3:] == "512":
-                        self.key = ec.generate_private_key(ec.SECP521R1())
+                    ec_curve = Cracker.get_ec_curve(self.alg)
+                    self.key = ec.generate_private_key(ec_curve)
                 else:
                     """We have a key file to read from"""
                     if self.x5u_basic or self.x5u_header_injection:
@@ -598,14 +594,22 @@ class Cracker:
             index = 0
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
-            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg[:2])
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
-            jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
-                (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
-            ).decode('utf-8').rstrip("=")
-            jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
-                (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
-            ).decode('utf-8').rstrip("=")
+            if self.alg[:2] in ["RS", "PS"]:
+                jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
+                    (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+                jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
+                    (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+            elif self.alg[:2] == "ES":
+                jwks_dict['keys'][index]['x'] = base64.urlsafe_b64encode(
+                    (self.key.pub.x).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+                jwks_dict['keys'][index]['y'] = base64.urlsafe_b64encode(
+                    (self.key.pub.y).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
@@ -640,7 +644,7 @@ class Cracker:
             index = 0
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
-            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg[:2])
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
                 (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
@@ -684,7 +688,7 @@ class Cracker:
             index = 0
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
-            index = Cracker.find_verifier_key_from_jwk(self.token, jwks_dict, sign_hash, jwa=self.alg[:2])
+            index = Cracker.find_verifier_key_from_jwk(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             jwks_dict['keys'][index]['x5c'] = x5c_
         except (TypeError, IndexError):
@@ -724,7 +728,7 @@ class Cracker:
             index = 0
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
-            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg[:2])
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             jwks_dict['keys'][index]['x5c'] = x5c_
         except (TypeError, IndexError):
@@ -993,9 +997,8 @@ class Cracker:
     @staticmethod
     def get_sign_hash(alg):
         """
-        :param alg: The user specified alg -> str
+        :param alg: The JWA -> str
 
-        From the token alg string, retrieve the right alg function to be used for the signature
         :return: The right hash method
         """
         if alg[:2] == "HS":
@@ -1015,6 +1018,25 @@ class Cracker:
         else:
             return None
         return sign_hash
+
+    @staticmethod
+    def get_ec_curve(alg):
+        """
+        :param alg: The JWA -> str
+
+        :return: The right curve method
+        """
+        if alg[:2] != "ES":
+            return None
+        if alg[-3:] == "256":
+            curve = ec.SECP256R1()
+        elif alg[-3:] == "384":
+            curve = ec.SECP384R1()
+        elif alg[-3:] == "521":
+            curve = ec.SECP521R1()
+        else:
+            return None
+        return curve
 
     @staticmethod
     def sign_token_with_hmac(key, partial_token, sign_hash):
@@ -1163,7 +1185,7 @@ class Cracker:
         return public_key
 
     @staticmethod
-    def gen_public_key_from_jwk(jwk):
+    def gen_rsa_public_key_from_jwk(jwk):
         """
         :param jwk: A jwk claim -> dict
 
@@ -1179,17 +1201,38 @@ class Cracker:
         e_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(e64))
         n = int.from_bytes(n_bytes, byteorder="big")
         e = int.from_bytes(e_bytes, byteorder="big")
-        cryptography_public_numbers = RSAPublicNumbers(e, n)
-        public_key = cryptography_public_numbers.public_key(backend)
+        public_numbers = RSAPublicNumbers(e, n)
+        public_key = public_numbers.public_key(backend)
         return public_key
 
     @staticmethod
-    def find_verifier_key_from_jwks(token, jwks_dict, sign_hash, jwa="RS"):
+    def gen_ec_public_key_from_jwk(jwk):
+        """
+        :param jwk: A jwk claim -> dict
+
+        Extrac x and y from the jwk and craft the relative public key
+        :return: The public key
+        """
+        try:
+            x_64 = jwk['x']
+            y_64 = jwk['y']
+        except KeyError:
+            return None
+        x_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(x_64))
+        y_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(y_64))
+        x = int.from_bytes(x_bytes, byteorder="big")
+        y = int.from_bytes(y_bytes, byteorder="big")
+        public_numbers = EllipticCurvePublicNumbers(x, y, ec_curve)
+        public_key = public_numbers.public_key(backend)
+        return public_key
+
+    @staticmethod
+    def find_verifier_key_from_jwks(token, jwks_dict, sign_hash, jwa="RS256"):
         """
         :param token: A complete JWT -> str
         :param jwks_dict: The content of a jwks file loaded with json -> dict
         :param sign_hash: The hash for verification -> cryptography.hazmat.primitives.hashes method
-        :param jwa: The json web algortihm type, usually the first 2 chars of self.alg -> str
+        :param jwa: The token algorithm -> str
 
         Given a jwks object, for all jwk it contains, generate the public key and try to verify the token
         with it. If the verification is successfull, it breaks the loop.
@@ -1197,11 +1240,16 @@ class Cracker:
         """
         i = 0
         for jwk in jwks_dict['keys']:
-            public_key = Cracker.gen_public_key_from_jwk(jwk)
-            if jwa == "RS":
+            if jwa[:2] == "ES":
+                public_key = Cracker.gen_ec_public_key_from_jwk(jwk)
+            elif jwa[:2] in ["RS", "PS"]:
+                public_key = Cracker.gen_rsa_public_key_from_jwk(jwk)
+            if jwa[:2] == "RS":
                 is_this_key = Cracker.verify_token_with_rsa_pkcs1(public_key, token, sign_hash)
-            elif jwa == "PS":
+            elif jwa[:2] == "PS":
                 is_this_key = Cracker.varify_token_with_rsa_pss(public_key, token, sign_hash)
+            elif jwa[:2] == "ES":
+                is_this_key = Cracker.verify_token_with_ec(public_key, token, sign_hash)
             else:
                 return None
             if is_this_key:
