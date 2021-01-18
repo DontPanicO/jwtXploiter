@@ -250,7 +250,7 @@ class Cracker:
                         except subprocess.CalledProcessError:
                             print(f"{Bcolors.FAIL}jwtxpl: err: Error during cert request, please check your connection{Bcolors.FAIL}")
                             sys.exit(7)
-                        self.path_to_key = "rsa_jwtxpl_key.pem"
+                        self.path_to_key = "key.pem"
                     """Read the key from the file"""
                     key_file = open(self.path_to_key, 'r')
                     key_read = key_file.read()
@@ -297,7 +297,7 @@ class Cracker:
                         except subprocess.CalledProcessError:
                             print(f"{Bcolors.FAIL}jwtxpl: err: Error during cert request, please check your connection{Bcolors.ENDC}")
                             sys.exit(7)
-                        self.path_to_key = "ec_jwtxpl_key.pem"
+                        self.path_to_key = "key.pem"
                     with open(self.path_to_key, 'rb') as keyfile:
                         self.key = load_pem_private_key(keyfile.read(), password=None)
                 "Extract the public key and public numbers"
