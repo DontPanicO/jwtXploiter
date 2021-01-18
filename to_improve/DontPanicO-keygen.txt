@@ -1,0 +1,4 @@
+==== OpenSSL dependecy can be dropped off ====
+# We don't need OpenSSL anymore in order to generate
+# keys. We can use cryptography and break free from
+# pyopenssl library dependency.
