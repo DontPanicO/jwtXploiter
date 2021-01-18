@@ -598,17 +598,17 @@ class Cracker:
         try:
             if self.alg[:2] in ["RS", "PS"]:
                 jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
-                    (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
+                    self.key.pub.e.to_bytes(self.key.pub.e.bit_length() // 8 + 1, byteorder='big')
                 ).decode('utf-8').rstrip("=")
                 jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
-                    (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
+                    self.key.pub.n.to_bytes(self.key.pub.n.bit_length() // 8 + 1, byteorder='big')
                 ).decode('utf-8').rstrip("=")
             elif self.alg[:2] == "ES":
                 jwks_dict['keys'][index]['x'] = base64.urlsafe_b64encode(
-                    (self.key.pub.x).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
+                    self.key.pub.x.to_bytes(self.key.pub.x.bit_length() // 8 + 1, byteorder='big')
                 ).decode('utf-8').rstrip("=")
                 jwks_dict['keys'][index]['y'] = base64.urlsafe_b64encode(
-                    (self.key.pub.y).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
+                    self.key.pub.y.to_bytes(self.key.pub.y.bit_length() // 8 + 1, byteorder='big')
                 ).decode('utf-8').rstrip("=")
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
@@ -646,12 +646,20 @@ class Cracker:
             sign_hash = Cracker.get_sign_hash(self.alg)
             index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
-            jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
-                (self.key.pub.e).to_bytes((self.key.pub.e).bit_length() // 8 + 1, byteorder='big')
-            ).decode('utf-8').rstrip("=")
-            jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
-                (self.key.pub.n).to_bytes((self.key.pub.n).bit_length() // 8 + 1, byteorder='big')
-            ).decode('utf-8').rstrip("=")
+            if self.alg[:2] in ["RS", "PS"]:
+                jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
+                    self.key.pub.e.to_bytes(self.key.pub.e.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+                jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
+                    self.key.pub.n.to_bytes(self.key.pub.n.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+            elif self.alg[:2] == "ES":
+                jwks_dict['keys'][index]['x'] = base64.urlsafe_b64encode(
+                    self.key.pub.x.to_bytes(self.key.pub.x.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+                jwks_dict['keys'][index]['y'] = base64.urlsafe_b64encode(
+                    self.key.pub.y.to_bytes(self.key.pub.y.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
