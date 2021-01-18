@@ -37,7 +37,7 @@ import urllib.parse
 try:
     import OpenSSL
     from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric import padding, ec
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa, ec
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
     from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicNumbers
     from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
@@ -230,18 +230,15 @@ class Cracker:
                 elif not any(self.jwks_args + [self.path_to_key, self.unverified]):
                     print(f"{Bcolors.FAIL}jwtxpl: err: Missing an arg for the key{Bcolors.ENDC}")
                     sys.exit(4)
-                elif len(list(filter(lambda x: x, self.jwks_args + [self.path_to_key, self.unverified]))) > 1:
+                elif len(list(filter(lambda x: x, self.jwks_args + [self.unverified]))) > 1:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related arg {Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
-                read_key = [self.path_to_key, self.x5u_basic, self.x5u_header_injection]
-                if not any(read_key):
-                    """We have no key file to read from"""
-                    key = OpenSSL.crypto.PKey()
-                    key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
-                    self.key = key
+                key_read_args = [self.path_to_key, self.x5u_basic, self.x5u_header_injection]
+                if not any(key_read_args):
+                    """No key file to read from"""
+                    self.key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
                 else:
-                    """We have a key file to read from"""
                     if self.x5u_basic or self.x5u_header_injection:
                         """Req a new cert and a new key file"""
                         x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/S=Ohio/L=Columbus/O=TestingInc/CN=testing"'
@@ -251,16 +248,9 @@ class Cracker:
                             print(f"{Bcolors.FAIL}jwtxpl: err: Error during cert request, please check your connection{Bcolors.FAIL}")
                             sys.exit(7)
                         self.path_to_key = "key.pem"
-                    """Read the key from the file"""
-                    key_file = open(self.path_to_key, 'r')
-                    key_read = key_file.read()
-                    key_file.close()
-                    key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, key_read)
-                    self.key = key
-                """The key is converted in a cryptography.hazmat.backends.openssl.rsa._RSAPrivateKey object"""
-                self.key.priv = key.to_cryptography_key()
-                """Same but _RSAPublicKey object"""
-                self.key.pub = self.key.priv.public_key()
+                    self.key = Cracker.read_pem_private_key(self.path_to_key)
+                """Extract public key"""
+                self.key.pub = self.key.public_key()
                 """Extrac the n and the e"""
                 self.key.pub.e = self.key.pub.public_numbers().e
                 self.key.pub.n = self.key.pub.public_numbers().n
@@ -273,7 +263,7 @@ class Cracker:
                 elif not any(self.jwks_args + [self.path_to_key, self.unverified]):
                     print(f"{Bcolors.FAIL}jwtxpl: err: Missing an arg for the key{Bcolors.ENDC}")
                     sys.exit(4)
-                elif len(list(filter(lambda x: x, self.cant_asymmetric_args + [self.path_to_key, self.unverified]))) > 1:
+                elif len(list(filter(lambda x: x, self.jwks_args + [self.unverified]))) > 1:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related argument{Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
@@ -291,15 +281,14 @@ class Cracker:
                             curve = "secp384r1"
                         elif self.alg[-3:] == "512":
                             curve = "secp521r1"
-                        x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout key.pem -x509 -days 365 -out testing.crt'
+                        x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/S=Ohio/L=Columbus/O=TestingInc/CN=testing"'
                         try:
                             subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
                         except subprocess.CalledProcessError:
                             print(f"{Bcolors.FAIL}jwtxpl: err: Error during cert request, please check your connection{Bcolors.ENDC}")
                             sys.exit(7)
                         self.path_to_key = "key.pem"
-                    with open(self.path_to_key, 'rb') as keyfile:
-                        self.key = load_pem_private_key(keyfile.read(), password=None)
+                    self.key = Cracker.read_pem_private_key(self.path_to_key)
                 "Extract the public key and public numbers"
                 self.key.pub = self.key.public_key()
                 self.key.pub.x = self.key.public_numbers().x
@@ -392,19 +381,19 @@ class Cracker:
         sign_hash = Cracker.get_sign_hash(self.alg)
         try:
             if self.alg[:2] == "RS":
-                key = Cracker.read_public_key(self.verify_token_with)
+                key = Cracker.read_pem_public_key(self.verify_token_with)
                 if key is None:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Key file is not PEM format{Bcolors.ENDC}")
                     sys.exit(6)
                 verified = Cracker.verify_token_with_rsa_pkcs1(key, self.token, sign_hash)
             elif self.alg[:2] == "PS":
-                key = Cracker.read_public_key(self.verify_token_with)
+                key = Cracker.read_pem_public_key(self.verify_token_with)
                 if key is None:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Key file is not PEM format{Bcolors.ENDC}")
                     sys.exit(6)
                 verified = Cracker.verify_token_with_rsa_pss(key, self.token, sign_hash)
             elif self.alg[:2] == "ES":
-                key = Cracker.read_public_key(self.verify_token_with)
+                key = Cracker.read_pem_public_key(self.verify_token_with)
                 if key is None:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Key file is not PEM format{Bcolors.ENDC}")
                     sys.exit(6)
@@ -776,12 +765,12 @@ class Cracker:
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with RS*{Bcolors.ENDC}")
                         sys.exit(4)
-                    signature = Cracker.sign_token_with_rsa_pkcs1(self.key.priv, partial_token, sign_hash)
+                    signature = Cracker.sign_token_with_rsa_pkcs1(self.key, partial_token, sign_hash)
                 elif self.alg[:2] == "PS":
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with PS*{Bcolors.ENDC}")
                         sys.exit(4)
-                    signature = Cracker.sign_token_with_rsa_pss(self.key.priv, partial_token, sign_hash)
+                    signature = Cracker.sign_token_with_rsa_pss(self.key, partial_token, sign_hash)
                 elif self.alg[:2] == "ES":
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: err: Key is needed with ES*{Bcolors.ENDC}")
@@ -1178,7 +1167,7 @@ class Cracker:
             return True
 
     @staticmethod
-    def read_public_key(path):
+    def read_pem_public_key(path):
         """
         :param path: The path to the pem public key -> str
 
@@ -1191,6 +1180,15 @@ class Cracker:
             except ValueError:
                 return None
         return public_key
+
+    @staticmethod
+    def read_pem_private_key(path):
+        with open(path, 'rb') as keyfile:
+            try:
+                private_key = load_pem_private_key(keyfile.read(), password=None)
+            except ValueError:
+                return None
+        return private_key
 
     @staticmethod
     def gen_rsa_public_key_from_jwk(jwk):
