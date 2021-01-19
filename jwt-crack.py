@@ -193,7 +193,8 @@ class Cracker:
         """Validate alg"""
         if self.alg is not None:
             valid_algs = [
-                "none", "hs256", "hs384", "hs512",
+                "none", "None",
+                "hs256", "hs384", "hs512",
                 "rs256", "rs384", "rs512",
                 "ps256", "ps384", "ps512",
                 "es256", "es384", "es512",
