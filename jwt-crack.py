@@ -203,7 +203,7 @@ class Cracker:
         try:
             if self.add_time:
                 self.add_time = int(self.add_time)
-                if not 0 < self.time_add < 25:
+                if not 0 < self.add_time < 25:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Accepted time values are from 1 to 24{Bcolors.ENDC}")
                     sys.exit(6)
             if self.sub_time:
