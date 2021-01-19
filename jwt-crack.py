@@ -203,8 +203,14 @@ class Cracker:
         try:
             if self.add_time:
                 self.add_time = int(self.add_time)
+                if not 0 < self.time_add < 25:
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Accepted time values are from 1 to 24{Bcolors.ENDC}")
+                    sys.exit(6)
             if self.sub_time:
                 self.sub_time = int(self.sub_time)
+                if not 0 < self.sub_time < 25:
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Accepted time values are from 1 to 24{Bcolors.ENDC}")
+                    sys.exit(6)
         except ValueError:
             print(f"{Bcolors.FAIL}jwtxpl: err: Time values must be numeric{Bcolors.ENDC}")
             sys.exit(6)
@@ -1036,8 +1042,6 @@ class Cracker:
         if not any(claim in iterable.keys() for claim in time_claims):
             print(f"{Bcolors.FAIL}jwtxpl: err: Token payload has no time claim{Bcolors.ENDC}")
             sys.exit(6)
-        if not 0 < qt < 25:
-            print(f"{Bcolors.FAIL}jwtxpl: err: You can sub/add from 1 to 24 hours{Bcolors.ENDC}")
         for claim in time_claims:
             if claim in iterable.keys() and isinstance(claim, int):
                 if instruction == "add":
