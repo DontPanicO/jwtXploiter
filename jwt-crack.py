@@ -304,7 +304,7 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: err: Missing an arg for the key{Bcolors.ENDC}")
                     sys.exit(4)
                 elif len(list(filter(lambda x: x, self.cant_asymmetric_args + [self.path_to_key, self.unverified]))) > 1:
-                    print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related args{Bcolor.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: Too many key related args{Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
                 if self.auto_try is not None:
