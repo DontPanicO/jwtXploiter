@@ -215,6 +215,10 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: err: Time values must be numeric{Bcolors.ENDC}")
             sys.exit(6)
         """Validate alg"""
+        if not self.decode:
+            if not self.alg:
+                print(f"{Bcolors.FAIL}jwtxpl: err: Missing --alg. Alg is always required if you are not decoding{Bcolors.ENDC}")
+                sys.exit(4)
         if self.alg is not None:
             valid_algs = [
                 "none", "None",
@@ -1037,7 +1041,6 @@ class Cracker:
         them
         :return: The modified iterable
         """
-        qt = int(qt)
         time_claims = ['iat', 'exp', 'nbf']
         if not any(claim in iterable.keys() for claim in time_claims):
             print(f"{Bcolors.FAIL}jwtxpl: err: Token payload has no time claim{Bcolors.ENDC}")
@@ -1047,7 +1050,7 @@ class Cracker:
                 if instruction == "add":
                     iterable[claim] += qt * 3600
                 elif instruction == "del":
-                    iterable[claim] -= qt * 3600 
+                    iterable[claim] -= qt * 3600
         return iterable
 
     @staticmethod
@@ -1481,7 +1484,7 @@ class Cracker:
         if self.decode:
             self.decode_and_quit()
         if self.alg is None:
-            print(f"{Bcolors.FAIL}jwtxpl: err: Missing --alg. You can mess it up only if you are decoding a jwt{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtxpl: err: Missing --alg. Alg is required if you are not decoding{Bcolors.ENDC}")
             sys.exit(4)
         if self.verify_token_with is not None:
             self.verify_and_quit()
