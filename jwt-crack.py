@@ -87,7 +87,7 @@ class Cracker:
 
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
-                 unverified=False, blank=False, decode=False, manual=False, generate_jwk=False):
+                 sub_time, add_time, unverified=False, blank=False, decode=False, manual=False, generate_jwk=False):
         """
         :param token: The user input token -> str
         :param alg: The algorithm for the attack. HS256 or None -> str
@@ -106,6 +106,8 @@ class Cracker:
         :param x5u_basic: The main url on which the user want to host the malformed jwks file -> str
         :param x5u_header_injection: The server url vulnerable to HTTP header injection -> str
         :param verify_token_with: The file of the public key to be used for verification -> str
+        :param sub_time: Hours to subtract from time claims if any -> str
+        :param add_time: Hours to add to time claims if any -> str
         :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool
         :param blank: A flag to set if the key has to be an empty string -> Bool
         :param decode: A flag to set if the user need only to decode the token -> Bool
@@ -138,6 +140,8 @@ class Cracker:
         self.x5u_basic = x5u_basic
         self.x5u_header_injection = x5u_header_injection
         self.verify_token_with = verify_token_with
+        self.sub_time = sub_time
+        self.add_time = add_time
         self.unverified = unverified
         self.blank = blank
         self.decode = decode
@@ -162,20 +166,25 @@ class Cracker:
 
         1)Validate the token: Using check_token, looks if the token is valid. If not quits out.
 
-        2)Validate alg: If an algorithm has been passed, it checks that's a valid one. If it's None or none, checks that no
+        2)Validate time values: If a time claim related arg has been passed it checks that has a proper value. If not quits.
+
+        3)Validate alg: If an algorithm has been passed, it checks that's a valid one. If it's None or none, checks that no
         argument contained in self.require_alg_args, has been passed. Then advises the user that some libraries use none, while
         others None. Then if an RSA/ec based alg has been set by the user, it checks that he's running a proper attack. Finally,
         set self.alg as uppercase.
 
-        3)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
+        4)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
         This validation has to solve lot of possible conflicts, at least giving warnings to the user and giving priority
-        to the right argument. First, if self.decode is true, all this validation will be skipped, since decoding the token
-        does not need any key, and it will quits immediately after the decoded header and payload have been printed out.
+        to the right argument. First, if one of self.decode or self.verify_token_ with is true, all this validation will
+        be skipped, since decoding the token does not need any key, and it will quits immediately after the decoded header
+        and payload have been printed out.
         Then it checks for conflicts with self.manual. This is not a key related argument, but there was no better ways to
-        place it. If self.alg is RS* it looks for: No argument in self.cant_asymmetric is True; At least one argument in
-        self.jwks_args or self.path_to_key is True; No more than one argument in self.jwks_args or self.path_to_key is True.
-        The it checks if the key pair has to be generated or if we have a key file to start from. The completes the key
+        place it. If self.alg is RS* or PS* it looks for: No argument in self.cant_asymmetric is True; At least one argument
+        in self.jwks_args or self.path_to_key is True; No more than one argument in self.jwks_args or self.path_to_key is
+        True. Then it checks if the key pair has to be generated or if we have a key file to start from. The completes the key
         generation extracting also the modulus and the exponent to be inserted in the jwks file.
+        If self.alg is ES*, validation is identical to RS*/PS*, but with elliptic curve cryptography. So the tool need also to
+        determine which curve to use, calling get_ec_curve.
         If self.alg is HS* instead, it looks for: No argument in self.jwks_args is True; At least one argument in
         self.cant_asymmetric or self.path_to_key is True; No more than one argument in self.cant_asymmetric or self.path_to_key
         is True. If self.auto_try is True call get_key_from_ssl_cert and store the path to the key file in self.path_to_key.
@@ -188,8 +197,17 @@ class Cracker:
         """Validate the token"""
         token_is_valid = Cracker.check_token(self.token)
         if not token_is_valid:
-            print("jwtxpl: err: Invalid token!")
+            print(f"{Bcolors.FAIL}jwtxpl: err: Invalid token!{Bcolors.ENDC}")
             sys.exit(3)
+        """Validate Time"""
+        try:
+            if self.add_time:
+                self.add_time = int(self.add_time)
+            if self.sub_time:
+                self.sub_time = int(self.sub_time)
+        except ValueError:
+            print(f"{Bcolors.FAIL}jwtxpl: err: Time values must be numeric{Bcolors.ENDC}")
+            sys.exit(6)
         """Validate alg"""
         if self.alg is not None:
             valid_algs = [
@@ -451,6 +469,10 @@ class Cracker:
                 elif to_dict == "payload":
                     print(f"{Bcolors.WARNING}jwtxpl: warn: Adding key to payload is useless since you can do it directly via --payload{Bcolors.ENDC}")
                     payload_dict = Cracker.add_key(payload_dict, to_add)
+        if self.add_time:
+            payload_dict = Cracker.modify_time_claims(self.add_time, payload_dict, instruction="add")
+        if self.sub_time:
+            payload_dict = Cracker.modify_time_claims(self.sub_time, payload_dict, instruction="del")
         if self.kid:
             if "kid" not in header_dict.keys():
                 print(f"{Bcolors.FAIL}jwtxpl: err: JWT header has no kid{Bcolors.ENDC}")
@@ -999,6 +1021,32 @@ class Cracker:
         return encoded_header + "." + encoded_payload
 
     @staticmethod
+    def modify_time_claims(qt, iterable, instruction="add"):
+        """
+        :param qt: The quantity of hours the del/add from time claims -> int
+        :param iterable: The payload dict -> dict
+        :param instruction: 'add' if time have to be added 'del' if deleted.
+
+        Checks that iterable contain time claims and that qt has a valid value, then modify
+        them
+        :return: The modified iterable
+        """
+        qt = int(qt)
+        time_claims = ['iat', 'exp', 'nbf']
+        if not any(claim in iterable.keys() for claim in time_claims):
+            print(f"{Bcolors.FAIL}jwtxpl: err: Token payload has no time claim{Bcolors.ENDC}")
+            sys.exit(6)
+        if not 0 < qt < 25:
+            print(f"{Bcolors.FAIL}jwtxpl: err: You can sub/add from 1 to 24 hours{Bcolors.ENDC}")
+        for claim in time_claims:
+            if claim in iterable.keys() and isinstance(claim, int):
+                if instruction == "add":
+                    iterable[claim] += qt * 3600
+                elif instruction == "del":
+                    iterable[claim] -= qt * 3600 
+        return iterable
+
+    @staticmethod
     def get_sign_hash(alg):
         """
         :param alg: The JWA -> str
@@ -1486,6 +1534,14 @@ if __name__ == '__main__':
                         help="Set key as a blank string. Only with HS256",
                         required=False
                         )
+    parser.add_argument("-t", "--subtract-time",
+                        help="Hours to delete from time claims if any ('iat', 'exp', 'nbf'). From 1 to 24",
+                        metavar="<hours>", required=False
+                        )
+    parser.add_argument("-T", "--add-time",
+                        help="Hours to add to time claims if any ('iat', 'exp', 'nbf'). From 1 to 24",
+                        metavar="<hours>", required=False
+                        )
     parser.add_argument("-V", "--verify-token-with",
                         help="The key to verify the token with. Verify and exit",
                         metavar="<keyfile>", required=False
@@ -1557,7 +1613,7 @@ if __name__ == '__main__':
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
-        args.verify_token_with, args.unverified, args.blank, args.decode, args.manual, args.generate_jwk,
+        args.verify_token_with, args.subtract_time, args.add_time, args.unverified, args.blank, args.decode, args.manual, args.generate_jwk,
     )
 
     # Start the cracker
