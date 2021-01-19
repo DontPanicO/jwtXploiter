@@ -20,6 +20,9 @@ if [[ $1 == "" ]]; then
         echo "export PATH=$PATH:$HOME/bin" >> $HOME/.bashrc
         bindir="$HOME/bin"
     else
+        if [[ ! $PATH == *"/.local/bin"* ]]; then
+            echo $PATH:/$HOME/.local/bin/ >> $HONE/.bashrc
+        fi
         bindir="$HOME/.local/bin"
     fi
     chmod u+x $tool_path
