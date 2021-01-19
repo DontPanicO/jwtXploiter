@@ -1,4 +1,4 @@
-#!/usr/bin/python3.8
+#!/usr/bin/python3
 
 """
     A tool to test the security of JWTs.
@@ -1046,7 +1046,7 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: err: Token payload has no time claim{Bcolors.ENDC}")
             sys.exit(6)
         for claim in time_claims:
-            if claim in iterable.keys() and isinstance(claim, int):
+            if claim in iterable.keys() and isinstance(iterable[claim], int):
                 if instruction == "add":
                     iterable[claim] += qt * 3600
                 elif instruction == "del":
