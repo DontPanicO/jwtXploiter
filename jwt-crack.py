@@ -1262,6 +1262,12 @@ class Cracker:
 
     @staticmethod
     def read_pem_certificate(path):
+        """
+        :param path: The path to the pem certificate -> str
+
+        Read the cert file and generates a cryptography x509 object
+        :return: The certificate object
+        """
         with open(path, 'rb') as crtfile:
             try:
                 certificate = load_pem_x509_certificate(crtfile.read())
@@ -1271,6 +1277,12 @@ class Cracker:
 
     @staticmethod
     def read_pem_private_key(path):
+        """
+        :param path: The path to the pem private key -> str
+
+        Read the key file and generates a cryptography private key from it
+        :return: The private key object
+        """
         with open(path, 'rb') as keyfile:
             try:
                 private_key = load_pem_private_key(keyfile.read(), password=None)
@@ -1596,7 +1608,7 @@ if __name__ == '__main__':
                         required=False
                         )
     parser.add_argument("--auto-try",
-                        help="Retrieve public key from the target ssl cert",
+                        help="The target domain. Retrieve public key from the target ssl cert",
                         metavar="<domain>", required=False
                         )
     parser.add_argument("--inject-kid",
