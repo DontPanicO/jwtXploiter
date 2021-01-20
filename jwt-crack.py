@@ -47,7 +47,7 @@ except ModuleNotFoundError:
     sys.exit(11)
 
 
-CWD = "/".join(os.path.realpath(__file__).split("/")[1:-1]) + "/"
+CWD = os.path.dirname(__file__) + "/"
 
 
 class Bcolors:
