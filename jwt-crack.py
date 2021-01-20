@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.8
+#!/usr/bin/python3
 
 """
     A tool to test the security of JWTs.
@@ -40,7 +40,10 @@ try:
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
     from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicNumbers
     from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
+    from cryptography.x509 import load_pem_x509_certificate
     from cryptography.hazmat.backends.openssl import backend
+    from cryptography.hazmat.backends.openssl.rsa import _RSAPublicKey, _RSAPrivateKey
+    from cryptography.hazmat.backends.openssl.ec import _EllipticCurvePublicKey, _EllipticCurvePrivateKey
     from cryptography.exceptions import InvalidSignature
 except ModuleNotFoundError:
     print(f"jwtxpl: err: Missing dependecies\nRun ./install.sh or pip3 install -r requirements.txt")
@@ -148,7 +151,7 @@ class Cracker:
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
         self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key, self.blank]
         self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
-        """Store a command that need to run in case of x5u injection and open devnull"""
+        """Open devnull for stdin, stderr, stdout redirects"""
         self.devnull = open(os.devnull, 'wb')
         """Call the validation"""
         self.validation()
@@ -268,7 +271,7 @@ class Cracker:
                 else:
                     if self.x5u_basic or self.x5u_header_injection:
                         """Req a new cert and a new key file"""
-                        x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/S=Ohio/L=Columbus/O=TestingInc/CN=testing"'
+                        x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/CN=testing"'
                         try:
                             subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
                         except subprocess.CalledProcessError:
@@ -276,6 +279,9 @@ class Cracker:
                             sys.exit(7)
                         self.path_to_key = "key.pem"
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
+                    if isinstance(self.key, _EllipticCurvePrivateKey):
+                        print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. You should not use EC keys with RS*/PS*{Bcolors.ENDC}")
+                        sys.exit(2)
                 """Extract public key"""
                 self.key.pub = self.key.public_key()
                 """Extrac the n and the e"""
@@ -303,12 +309,12 @@ class Cracker:
                     """We have a key file to read from"""
                     if self.x5u_basic or self.x5u_header_injection:
                         if self.alg[-3:] == "256":
-                            curve = "secp256r1"
+                            curve = "prime256v1"
                         elif self.alg[-3:] == "384":
                             curve = "secp384r1"
                         elif self.alg[-3:] == "512":
                             curve = "secp521r1"
-                        x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/C=US/S=Ohio/L=Columbus/O=TestingInc/CN=testing"'
+                        x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/CN=testing"'
                         try:
                             subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
                         except subprocess.CalledProcessError:
@@ -316,6 +322,9 @@ class Cracker:
                             sys.exit(7)
                         self.path_to_key = "key.pem"
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
+                    if isinstance(self.key, _RSAPrivateKey):
+                        print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. You should not use RSA keys with ES*{Bcolors.FAIL}")
+                        sys.exit(2)
                 "Extract the public key and public numbers"
                 self.key.pub = self.key.public_key()
                 self.key.pub.x = self.key.pub.public_numbers().x
@@ -378,7 +387,8 @@ class Cracker:
                       self.remove_from, self.add_into, self.auto_try, self.kid,
                       self.exec_via_kid, self.specified_key, self.jku_basic,
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
-                      self.x5u_header_injection, self.verify_token_with, self.unverified,
+                      self.x5u_header_injection, self.verify_token_with,
+                      self.sub_time, self.add_time, self.unverified,
                       self.manual, self.generate_jwk
         ]
         if any(arg for arg in other_args):
@@ -402,7 +412,8 @@ class Cracker:
                       self.remove_from, self.add_into, self.auto_try, self.kid,
                       self.exec_via_kid, self.specified_key, self.jku_basic,
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
-                      self.x5u_header_injection, self.unverified, self.decode, self.manual,
+                      self.x5u_header_injection, self.sub_time, self.add_time,
+                      self.unverified, self.decode, self.manual,
                       self.generate_jwk
         ]
         if any(arg for arg in other_args):
@@ -412,27 +423,36 @@ class Cracker:
             if self.alg[:2] == "RS":
                 key = Cracker.read_pem_public_key(self.verify_token_with)
                 if key is None:
-                    print(f"{Bcolors.FAIL}jwtxpl: err: Key file is not PEM format{Bcolors.ENDC}")
-                    sys.exit(6)
+                    cert = Cracker.read_pem_certificate(self.verify_token_with)
+                    if cert is None:
+                        print(f"{Bcolors.FAIL}jwtxpl: err: key/cert file is not PEM format{Bcolors.ENDC}")
+                        sys.exit(6)
+                    key = cert.public_key()
                 verified = Cracker.verify_token_with_rsa_pkcs1(key, self.token, sign_hash)
             elif self.alg[:2] == "PS":
                 key = Cracker.read_pem_public_key(self.verify_token_with)
                 if key is None:
-                    print(f"{Bcolors.FAIL}jwtxpl: err: Key file is not PEM format{Bcolors.ENDC}")
-                    sys.exit(6)
+                    cert = Cracker.read_pem_certificate(self.verify_token_with)
+                    if cert is None:
+                        print(f"{Bcolors.FAIL}jwtxpl: err: key/cert file is not PEM format{Bcolors.ENDC}")
+                        sys.exit(6)
+                    key = cert.public_key()
                 verified = Cracker.verify_token_with_rsa_pss(key, self.token, sign_hash)
             elif self.alg[:2] == "ES":
                 key = Cracker.read_pem_public_key(self.verify_token_with)
                 if key is None:
-                    print(f"{Bcolors.FAIL}jwtxpl: err: Key file is not PEM format{Bcolors.ENDC}")
-                    sys.exit(6)
+                    cert = Cracker.read_pem_certificate(self.verify_token_with)
+                    if cert is None:
+                        print(f"{Bcolors.FAIL}jwtxpl: err: key/cert file is not PEM format{Bcolors.ENDC}")
+                        sys.exit(6)
+                    key = cert.public_key()
                 verified = Cracker.verify_token_with_ec(key, self.token, sign_hash)
             elif self.alg[:2] == "HS":
                 with open(self.verify_token_with, 'r') as file:
                     key = file.read()
                 verified = Cracker.verify_token_with_hmac(key, self.token, sign_hash)
         except (TypeError, AttributeError):
-            print(f"{Bcolors.FAIL}jwtxpl: err: Key mismatch. The key you passed is not compatible with {self.alg}{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtxpl: err: Key mismatch. the key you passed is not compatible with {self.alg}{Bcolors.ENDC}")
             sys.exit(2)
         result = f"Verified with {self.verify_token_with}" if verified else f"Unverified with {self.verify_token_with}"
         print(f"{Bcolors.HEADER}Token:{Bcolors.ENDC} {Bcolors.OKCYAN}{result}{Bcolors.ENDC}")
@@ -469,7 +489,7 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: err: --add-into must have key:value syntax, where key is header or payload{Bcolors.ENDC}")
                     sys.exit(5)
                 if to_dict != "header" and to_dict != "payload":
-                    print(f"{Bcolors.FAIL}jwtxpl: err: You can delete keys only from header and payload{Bcolors.ENDC}")
+                    print(f"{Bcolors.FAIL}jwtxpl: err: You can insert keys only into header and payload{Bcolors.ENDC}")
                     sys.exit(6)
                 if to_dict == "header":
                     header_dict = Cracker.add_key(header_dict, to_add)
@@ -1239,6 +1259,15 @@ class Cracker:
             except ValueError:
                 return None
         return public_key
+
+    @staticmethod
+    def read_pem_certificate(path):
+        with open(path, 'rb') as crtfile:
+            try:
+                certificate = load_pem_x509_certificate(crtfile.read())
+            except ValueError:
+                return None
+        return certificate
 
     @staticmethod
     def read_pem_private_key(path):
