@@ -6,13 +6,9 @@ script_name="jwt-crack.py"
 main_path="$(realpath $0)"
 tool_path=$(echo $main_path | cat | sed 's:install\.sh:jwt-crack\.py:')
 req_path=$(echo $main_path | cat | sed 's:isntall\.sh:requirements\.txt:')
-config_path=$(echo $main_path | cat | sed 's:install\.sh:config\.py:')
-to_config=$(echo $main_path | cat | sed 's:install\.sh::')
-absolute="$(pwd)/$scriptname"
+absolute="$(pwd)/$script_name"
 bintool="jwtxpl"
 
-
-echo "cwd = \"$to_config\"" >> $config_path
 
 if [[ $1 == "" ]]; then
     if [ ! -d "$HOME/.local/bin" ]; then
@@ -31,7 +27,7 @@ if [[ $1 == "" ]]; then
     echo "JWT cracker installed successfully. Now you can use jwtxpl <token> [OPTIONS]"
 
 
-elif [[ $1 == "all" || $f1 == "a" ]]; then
+elif [[ $1 == "all" || $1 == "a" ]]; then
     if [[ $(id | grep sudo) == "" && $(id | grep "uid=0") == "" ]]; then
         echo "You have not root privileges. Only root can install the script for all users"
         exit

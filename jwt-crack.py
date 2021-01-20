@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3.8
 
 """
     A tool to test the security of JWTs.
@@ -46,11 +46,8 @@ except ModuleNotFoundError:
     print(f"jwtxpl: err: Missing dependecies\nRun ./install.sh or pip3 install -r requirements.txt")
     sys.exit(11)
 
-try:
-    from config import cwd
-except ImportError:
-    path = os.path.abspath(sys.argv[0])
-    cwd = "/".join(path.split("/")[:-1]) + "/"
+
+CWD = "/".join(os.path.realpath(__file__).split("/")[1:-1]) + "/"
 
 
 class Bcolors:
@@ -641,7 +638,7 @@ class Cracker:
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
-        file = open(f"{cwd}crafted/jwks.json", 'w')
+        file = open(f"{CWD}crafted/jwks.json", 'w')
         file.write(json.dumps(jwks_dict, indent=4))
         file.close()
         os.remove(filename)
@@ -730,7 +727,7 @@ class Cracker:
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
-        file = open("{cwd}crafted/jwks.json", 'w')
+        file = open("{CWD}crafted/jwks.json", 'w')
         file.write(json.dumps(jwks_dict, indent=4))
         file.close()
         os.remove(filename)
