@@ -7,6 +7,6 @@
 
 ==== Implement subclaims generation ====
 # Until now, calling --payload on a non existing claim will result in its
-# creation while --complex-payload won't.
+# creation while --complex-payload won't (subclaims can only be changes).
 # This can be resolved adding automatic creation of subclaims via
 # --complex-payload or manual creation via --add-into.
