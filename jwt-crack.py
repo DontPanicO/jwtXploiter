@@ -1391,16 +1391,21 @@ class Cracker:
         :param string: A string containig one value, or a list of them separated by commas -> str
 
         If at least one comma is present in the string, the function splits it by commas. Then it checks in the returned
-        list, if any empy string exists and, case it is, deletes them.
+        list, if any empy string exists and, case it is, deletes them. If any value is "null" it convert it in None.
 
-        :return: The values list, if string contained values comma separated, else the string itself.
+        :return: The values list, if string contained values comma separated, else the string itself or None if the string
+        was "null".
         """
         if "," in string:
             values = string.split(",")
             for i in range(len(values)):
                 if values[i] == "":
                     values.remove(values[i])
+                if values[i] == "null":
+                    values[i] = None
             return values
+        if string == "null":
+            return None
         return string
 
     @staticmethod
@@ -1437,9 +1442,9 @@ class Cracker:
         return iterable
 
     @staticmethod
-    def get_key_from_ssl_cert(hostname):
+    def get_key_from_ssl_cert(domain):
         """
-        :param hostname. The hostname of which you want to retrieve the cert -> str
+        :param domain: The domain name of which you want to retrieve the cert -> str
 
         First open devnull to redirect stdin, stdout or stderr if necessary, and defines a regex pattern to match the output of
         our first command. Then defines the command that we need to retrieve an ssl cert, launches it with subprocess and handle
@@ -1452,14 +1457,14 @@ class Cracker:
         devnull_ = open(os.devnull, 'wb')
         pattern = r'(?:Server\scertificate\s)((.|\n)*?)subject='
         """Get cert.pem"""
-        first_command = f"openssl s_client -connect {hostname}:443"
+        first_command = f"openssl s_client -connect {domain}:443"
         try:
             first_command_output = subprocess.check_output(
                 first_command, shell=True, stdin=devnull_, stderr=devnull_
             ).decode('utf-8')
         except subprocess.CalledProcessError:
             print(
-                f"{Bcolors.FAIL}jwtxpl: err: Can't openssl s_client can't connect with {hostname}. Please make sure to type correctly{Bcolors.ENDC}"
+                f"{Bcolors.FAIL}jwtxpl: err: Can't openssl s_client can't connect with {domain}. Please make sure to type correctly{Bcolors.ENDC}"
             )
             sys.exit(21)
         cert = re.findall(pattern, first_command_output)[0][0].rstrip("\n")
