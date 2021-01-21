@@ -1276,7 +1276,7 @@ class Cracker:
         return certificate
 
     @staticmethod
-    def read_pem_private_key(path):
+    def read_pem_private_key(path, password=None):
         """
         :param path: The path to the pem private key -> str
 
@@ -1285,7 +1285,7 @@ class Cracker:
         """
         with open(path, 'rb') as keyfile:
             try:
-                private_key = load_pem_private_key(keyfile.read(), password=None)
+                private_key = load_pem_private_key(keyfile.read(), password)
             except ValueError:
                 return None
         return private_key
@@ -1312,9 +1312,10 @@ class Cracker:
         return public_key
 
     @staticmethod
-    def gen_ec_public_key_from_jwk(jwk):
+    def gen_ec_public_key_from_jwk(jwk, alg):
         """
-        :param jwk: A jwk claim -> dict
+        :param jwk: A JWK claim -> dict
+        :param alg: The JWA -> str
 
         Extrac x and y from the jwk and craft the relative public key
         :return: The public key
@@ -1324,6 +1325,7 @@ class Cracker:
             y_64 = jwk['y']
         except KeyError:
             return None
+        ec_curve = Cracker.get_ec_curve(alg)
         x_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(x_64))
         y_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(y_64))
         x = int.from_bytes(x_bytes, byteorder="big")
@@ -1347,13 +1349,15 @@ class Cracker:
         i = 0
         for jwk in jwks_dict['keys']:
             if jwa[:2] == "ES":
-                public_key = Cracker.gen_ec_public_key_from_jwk(jwk)
+                public_key = Cracker.gen_ec_public_key_from_jwk(jwk, jwa)
             elif jwa[:2] in ["RS", "PS"]:
                 public_key = Cracker.gen_rsa_public_key_from_jwk(jwk)
+            if public_key is None:
+                return None
             if jwa[:2] == "RS":
                 is_this_key = Cracker.verify_token_with_rsa_pkcs1(public_key, token, sign_hash)
             elif jwa[:2] == "PS":
-                is_this_key = Cracker.varify_token_with_rsa_pss(public_key, token, sign_hash)
+                is_this_key = Cracker.verify_token_with_rsa_pss(public_key, token, sign_hash)
             elif jwa[:2] == "ES":
                 is_this_key = Cracker.verify_token_with_ec(public_key, token, sign_hash)
             else:
