@@ -744,6 +744,13 @@ class Cracker:
             index = Cracker.find_verifier_key_from_jwk(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             jwks_dict['keys'][index]['x5c'] = x5c_
+            if self.alg[:2] in ["RS", "PS"]:
+                jwks_dict['keys'][index]['n'] = self.key.pub.n
+                jwks_dict['keys'][index]['e'] = self.key.pub.e
+            elif self.alg[:2] == "ES":
+                jwks_dict['keys'][index]['x'] = self.key.pub.x
+                jwks_dict['keys'][index]['y'] = self.key.pub.y
+            # Need an else? Even if alg has already been validated???
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
@@ -784,6 +791,12 @@ class Cracker:
             index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             jwks_dict['keys'][index]['x5c'] = x5c_
+            if self.alg[:2] in ["RS", "PS"]:
+                jwks_dict['keys'][index]['n'] = self.pub.n
+                jwks_dict['keys'][index]['e'] = self.pub.e
+            elif self.alg[:2] == "ES":
+                jwks_dict['keys'][index]['x'] = self.pub.x
+                jwks_dict['keys'][index]['y'] = self.pub.y
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
@@ -869,7 +882,7 @@ class Cracker:
 
         :return: True, if the token match the pattern, False if not.
         """
-        token_pattern = r"^.+\..+\..*$"
+        token_pattern = r"^eyJ.+\.eyJ.+\..*$"
         match = re.match(token_pattern, token)
         if match:
             return True
@@ -1335,6 +1348,28 @@ class Cracker:
         return public_key
 
     @staticmethod
+    def gen_public_key_from_x5c(jwk):
+        """
+        :param jwk: A JWK claim -> dict
+
+        First checks if the x5c claim is an array or a string (usually is array), and stores the
+        value in the x5c variable. Then decodes the x5c and uses the obtained bytes to generate
+        the cert. Finally extracts the public key from the certificate.
+        :return: The public key
+        """
+        try:
+            if isinstance(jwk['x5c'], list):
+                x5c = jwk['x5c'][0]
+            elif isinstance(jwk['x5c'], str):
+                x5c = jwk['x5c']
+        except KeyError:
+            return None
+        x5c_bytes = base64.b64decode(x5c.encode())
+        cert = load_der_x509_certificate(x5c_bytes)
+        public_key = cert.public_key()
+        return public_key
+
+    @staticmethod
     def find_verifier_key_from_jwks(token, jwks_dict, sign_hash, jwa="RS256"):
         """
         :param token: A complete JWT -> str
@@ -1348,10 +1383,13 @@ class Cracker:
         """
         i = 0
         for jwk in jwks_dict['keys']:
-            if jwa[:2] == "ES":
-                public_key = Cracker.gen_ec_public_key_from_jwk(jwk, jwa)
-            elif jwa[:2] in ["RS", "PS"]:
-                public_key = Cracker.gen_rsa_public_key_from_jwk(jwk)
+            if 'x5c' in jwk.keys():
+                public_key = Cracker.gen_public_key_from_x5c(jwk)
+            else:
+                if jwa[:2] == "ES":
+                    public_key = Cracker.gen_ec_public_key_from_jwk(jwk, jwa)
+                elif jwa[:2] in ["RS", "PS"]:
+                    public_key = Cracker.gen_rsa_public_key_from_jwk(jwk)
             if public_key is None:
                 return None
             if jwa[:2] == "RS":
