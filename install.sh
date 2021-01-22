@@ -17,7 +17,7 @@ if [[ $1 == "" ]]; then
         bindir="$HOME/bin"
     else
         if [[ ! $PATH == *"/.local/bin"* ]]; then
-            echo $PATH:/$HOME/.local/bin/ >> $HONE/.bashrc
+            echo "export PATH=$PATH:/$HOME/.local/bin" >> $HONE/.bashrc
         fi
         bindir="$HOME/.local/bin"
     fi

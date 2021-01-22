@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3.8
 
 """
     A tool to test the security of JWTs.
@@ -1379,7 +1379,7 @@ class Cracker:
         :return: The list of keys, or None if separator is not present in string
         """
         if "," not in string:
-            return None
+            return string
         keys = string.split(",")
         for i in range(len(keys)):
             try:
@@ -1426,7 +1426,7 @@ class Cracker:
         """
         keys = Cracker.build_keys(string.split(":")[0].strip(","))
         vals = Cracker.build_values(string.split(":")[1].lstrip(","))
-        if keys is None:
+        if not isinstance(keys, list) and not len(keys) > 1:
             print(f"{Bcolors.FAIL}jwt: err: Can't split keys basing on ','. If you can access the claim using a single key, pleas use --payload{Bcolors.ENDC}")
             sys.exit(5)
         i = 0
