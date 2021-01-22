@@ -279,7 +279,7 @@ class Cracker:
                             sys.exit(7)
                         self.path_to_key = "key.pem"
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
-                    if isinstance(self.key, _EllipticCurvePrivateKey):
+                    if not isinstance(self.key, _RSAPrivateKey):
                         print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. You should not use EC keys with RS*/PS*{Bcolors.ENDC}")
                         sys.exit(2)
                 """Extract public key"""
@@ -322,7 +322,7 @@ class Cracker:
                             sys.exit(7)
                         self.path_to_key = "key.pem"
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
-                    if isinstance(self.key, _RSAPrivateKey):
+                    if not isinstance(self.key, _EllipticCurvePrivateKey):
                         print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. You should not use RSA keys with ES*{Bcolors.FAIL}")
                         sys.exit(2)
                 "Extract the public key and public numbers"
@@ -1531,7 +1531,7 @@ class Cracker:
         if self.decode:
             self.decode_and_quit()
         if self.alg is None:
-            print(f"{Bcolors.FAIL}jwtxpl: err: Missing --alg. Alg is required if you are not decoding{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtxpl: err: Missing --alg. Alg is required if you are not decoding(2){Bcolors.ENDC}")
             sys.exit(4)
         if self.verify_token_with is not None:
             self.verify_and_quit()

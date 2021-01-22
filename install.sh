@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-for_all=$1
+for_all="$1"
 script_name="jwt-crack.py"
 main_path="$(realpath $0)"
 tool_path=$(echo $main_path | cat | sed 's:install\.sh:jwt-crack\.py:')
@@ -22,7 +22,7 @@ if [[ $1 == "" ]]; then
         bindir="$HOME/.local/bin"
     fi
     chmod u+x $tool_path
-    pip3 install -r $req_path
+    python3 -m pip install -r $req_path
     ln -s $tool_path $bindir/$bintool
     echo "JWT cracker installed successfully. Now you can use jwtxpl <token> [OPTIONS]"
 
