@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.8
+#!/usr/bin/python3
 
 """
     A tool to test the security of JWTs.
@@ -743,7 +743,10 @@ class Cracker:
             sign_hash = Cracker.get_sign_hash(self.alg)
             index = Cracker.find_verifier_key_from_jwk(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
-            jwks_dict['keys'][index]['x5c'] = x5c_
+            if isinstance(jwks_dict['keys'][index]['x5c'], list):
+                jwks_dict['keys'][index]['x5c'].insert(0, x5c_)
+            else:
+                jwks_dict['keys'][index]['x5c'] = x5c_
             if self.alg[:2] in ["RS", "PS"]:
                 jwks_dict['keys'][index]['n'] = self.key.pub.n
                 jwks_dict['keys'][index]['e'] = self.key.pub.e
@@ -790,7 +793,10 @@ class Cracker:
             sign_hash = Cracker.get_sign_hash(self.alg)
             index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
-            jwks_dict['keys'][index]['x5c'] = x5c_
+            if isinstance(jwks_dict['keys'][index]['x5c'], list):
+                jwks_dict['keys'][index]['x5c'].insert(0, x5c_)
+            else:
+                jwks_dict['keys'][index]['x5c'] = x5c_
             if self.alg[:2] in ["RS", "PS"]:
                 jwks_dict['keys'][index]['n'] = self.pub.n
                 jwks_dict['keys'][index]['e'] = self.pub.e
