@@ -75,7 +75,7 @@ class Cracker:
 
     usage = """
         python3 jwt-crack.py <token> [OPTIONS]; OR
-        jwtxpl <token> [OPTIONS]; IF YOU HAVE USED install.py
+        jwtxpl <token> [OPTIONS]; IF YOU HAVE USED install.sh
 	"""
     command = ["jwtxpl"] + [sys.argv[i] for i in range(1, len(sys.argv))]
 
