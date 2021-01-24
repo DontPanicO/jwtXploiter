@@ -354,12 +354,12 @@ class Cracker:
                     elif self.kid.lower() == "rce":
                         self.kid = "RCE"
                         """Command will be executed before verifing the signature"""
-                        self.key = "itdoesnotmatter"
+                        self.unverified = True
                     else:
                         print(f"{Bcolors.FAIL}jwtxpl: err: Invalid --inject-kid{Bcolors.ENDC}")
                         sys.exit(6)
                 elif self.exec_via_kid is not None:
-                    self.key = "itdoesnotmatter"
+                    self.unverified = True
                 elif self.specified_key is not None:
                     self.key = self.specified_key
                 elif self.blank:
