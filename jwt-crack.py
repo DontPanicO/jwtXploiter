@@ -1426,6 +1426,9 @@ class Cracker:
             return string
         keys = string.split(",")
         for i in range(len(keys)):
+            if keys[i] == "":
+                keys.remove(keys[i])
+                continue
             try:
                 keys[i] = int(keys[i])
             except ValueError:
