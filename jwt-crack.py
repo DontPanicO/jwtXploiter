@@ -741,7 +741,7 @@ class Cracker:
             index = 0
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
-            index = Cracker.find_verifier_key_from_jwk(self.token, jwks_dict, sign_hash, jwa=self.alg)
+            index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             if isinstance(jwks_dict['keys'][index]['x5c'], list):
                 jwks_dict['keys'][index]['x5c'].insert(0, x5c_)
