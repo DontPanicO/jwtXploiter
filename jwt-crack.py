@@ -673,9 +673,8 @@ class Cracker:
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
-        file = open(f"{CWD}crafted/jwks.json", 'w')
-        file.write(json.dumps(jwks_dict, indent=4))
-        file.close()
+        with open(f"{CWD}crafted/jwks.json", 'w'):
+            file.write(json.dumps(jwks_dict, indent=4))
         os.remove(filename)
 
     def jku_via_header_injection(self, header):
@@ -761,9 +760,8 @@ class Cracker:
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: err: Non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
-        file = open("{CWD}crafted/jwks.json", 'w')
-        file.write(json.dumps(jwks_dict, indent=4))
-        file.close()
+        with open("{CWD}crafted/jwks.json", 'w'):
+            file.write(json.dumps(jwks_dict, indent=4))
         os.remove(filename)
 
     def x5u_via_header_injection(self, header):
