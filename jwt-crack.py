@@ -271,13 +271,16 @@ class Cracker:
                 else:
                     if self.x5u_basic or self.x5u_header_injection:
                         """Req a new cert and a new key file"""
-                        x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/CN=testing"'
+                        if not self.path_to_key:
+                            x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/CN=testing"'
+                            self.path_to_key = "key.pem"
+                        else:
+                            x5u_command = f'openssl req -key {self.path_to_key} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
                         try:
                             subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
                         except subprocess.CalledProcessError:
                             print(f"{Bcolors.FAIL}jwtxpl: err: Error during cert request, please check your connection{Bcolors.FAIL}")
                             sys.exit(7)
-                        self.path_to_key = "key.pem"
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
                     if not isinstance(self.key, _RSAPrivateKey):
                         print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. You should not use EC keys with RS*/PS*{Bcolors.ENDC}")
@@ -308,19 +311,22 @@ class Cracker:
                 else:
                     """We have a key file to read from"""
                     if self.x5u_basic or self.x5u_header_injection:
-                        if self.alg[-3:] == "256":
-                            curve = "prime256v1"
-                        elif self.alg[-3:] == "384":
-                            curve = "secp384r1"
-                        elif self.alg[-3:] == "512":
-                            curve = "secp521r1"
-                        x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/CN=testing"'
+                        if not self.path_to_key:
+                            if self.alg[-3:] == "256":
+                                curve = "prime256v1"
+                            elif self.alg[-3:] == "384":
+                                curve = "secp384r1"
+                            elif self.alg[-3:] == "512":
+                                curve = "secp521r1"
+                            x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/CN=testing"'
+                            self.path_to_key = "key.pem"
+                        else:
+                            x5u_command = f'openssl req -key {self.path_to_key} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
                         try:
                             subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
                         except subprocess.CalledProcessError:
                             print(f"{Bcolors.FAIL}jwtxpl: err: Error during cert request, please check your connection{Bcolors.ENDC}")
                             sys.exit(7)
-                        self.path_to_key = "key.pem"
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
                     if not isinstance(self.key, _EllipticCurvePrivateKey):
                         print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. You should not use RSA keys with ES*{Bcolors.FAIL}")
