@@ -679,7 +679,7 @@ class Cracker:
 
     def jku_via_header_injection(self, header):
         """
-        :param header: The header dictonary -> dict.
+        :param header: The header dictionary -> dict.
         Same as self.jku_basic_attack, but instead of write a jwks file, returns the content in an HTTP response body
         format.
 
@@ -723,7 +723,7 @@ class Cracker:
 
     def x5u_basic_attack(self, header):
         """
-        :param header: The header dictonary -> dict
+        :param header: The header dictionary -> dict
 
         Gets the jwks.json file from the url specified in the x5u header. Then loads the file as json in order to
         access it and changes the x5c (the X509 cert) with our generated one. Then creates a file named jwks.json
@@ -1127,7 +1127,7 @@ class Cracker:
         elif alg[-3:] == "521":
             curve = ec.SECP521R1()
         else:
-            return None
+            return None    # NEED THIS ELSE?
         return curve
 
     @staticmethod
