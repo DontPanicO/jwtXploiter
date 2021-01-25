@@ -239,7 +239,8 @@ class Cracker:
                 if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with, self.unverified]):
                     print(f"{Bcolors.FAIL}jwtxpl: err: RSA/EC is supported only for jwks, verification or simple signing{Bcolors.ENDC}")
                     sys.exit(4)
-            self.alg = self.alg.upper()
+            if self.alg.lower() != "none":
+                self.alg = self.alg.upper()
         """Force self.alg to RS256 for jku attacks if a non RSA/EC alg has been selected"""
         if any(arg for arg in self.jwks_args):
             if self.alg is not None and self.alg[:2] not in ["RS", "PS", "ES"]:
@@ -385,7 +386,6 @@ class Cracker:
                         sys.exit(7)
                     self.file = open(self.path_to_key, 'r')
                     self.key = self.file.read()
-
 
     def decode_and_quit(self):
         """
