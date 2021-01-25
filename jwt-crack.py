@@ -46,7 +46,7 @@ try:
     from cryptography.hazmat.backends.openssl.ec import _EllipticCurvePublicKey, _EllipticCurvePrivateKey
     from cryptography.exceptions import InvalidSignature
 except ModuleNotFoundError:
-    print(f"jwtxpl: err: Missing dependecies\nRun ./install.sh or pip3 install -r requirements.txt")
+    print(f"jwtxpl: err: Missing dependencies\nRun ./install.sh or pip3 install -r requirements.txt")
     sys.exit(11)
 
 
@@ -468,7 +468,7 @@ class Cracker:
         those headers with the related payload.
         It changes the algorithm to the one specified by the user, then look he has also declared any payload change.
         If he has, the function calls the change_payload method, for each change stored in self.user_payload.
-        If self.remove_from has been passed, it removes the speicifed key/s from the corresponding dictionary.
+        If self.remove_from has been passed, it removes the specified key/s from the corresponding dictionary.
 
         N.B. self.user_payload is a list and, any time the user call a -p, the value went stored in another list inside
         self.user_payload. So it basically contains as many list as the user calls to --payload. And the value of each
@@ -623,7 +623,7 @@ class Cracker:
         :param header: The header dictionary -> dict.
 
         Gets the jwks.json file from the url specified in the jku header. Then loads the file as json in order to
-        accesses it to change the modulus and the esponent with the ones of our generated key. Then creates a new
+        accesses it to change the modulus and the exponent with the ones of our generated key. Then creates a new
         file named jwks.json in the crafted/ directory and writes the dump of the jwks dict into it.
         """
         command = "wget " + header['jku']
@@ -1030,13 +1030,13 @@ class Cracker:
     @staticmethod
     def add_key(iterable, key):
         """
-        :param iterable: The header dictonary or the payload one -> dict
-        :param key: The key to insert into the dictonary -> str
+        :param iterable: The header dictionary or the payload one -> dict
+        :param key: The key to insert into the dictionary -> str
 
-        The function first check that the specified key does not already exists in the dictonary, else returns an error and
+        The function first check that the specified key does not already exists in the dictionary, else returns an error and
         quits out. If the key does not exists, it adds the new items with a default value.
 
-        :return: The modified dictonary
+        :return: The modified dictionary
         """
         if key in iterable.keys():
             print(f"{Bcolors.FAIL}jwtxpl: err: You are trying to add a key that already exists{Bcolors.ENDC}")
@@ -1389,7 +1389,7 @@ class Cracker:
         :param jwa: The token algorithm -> str
 
         Given a jwks object, for all jwk it contains, generate the public key and try to verify the token
-        with it. If the verification is successfull, it breaks the loop.
+        with it. If the verification is successful, it breaks the loop.
         :return: The jwk object index or None if no keys can verify the token
         """
         i = 0
@@ -1420,7 +1420,7 @@ class Cracker:
     def build_keys(string):
         """
         Build a list of keys
-        :param string: A string containing the kyes, separated by ',' -> str
+        :param string: A string containing the keys, separated by ',' -> str
 
         The function first check for the separator, and quits out if is not present. Then split the string and check for
         integers ones.
@@ -1444,10 +1444,10 @@ class Cracker:
     def build_values(string):
         """
         Build a list of values
-        :param string: A string containig one value, or a list of them separated by commas -> str
+        :param string: A string containing one value, or a list of them separated by commas -> str
 
         If at least one comma is present in the string, the function splits it by commas. Then it checks in the returned
-        list, if any empy string exists and, case it is, deletes them. If any value is "null" it convert it in None.
+        list, if any empty string exists and, case it is, deletes them. If any value is "null" it convert it in None.
 
         :return: The values list, if string contained values comma separated, else the string itself or None if the string
         was "null".
@@ -1471,7 +1471,7 @@ class Cracker:
         :param iterable: The payload dictionary -> dict
 
         The function calls build_keys and build_values, passing them the rith part of the string (splitted by ':').
-        Then it iterates trough the keys list builing the path to iterable item to be changed. When the item
+        Then it iterates trough the keys list building the path to iterable item to be changed. When the item
         has been accessed (the last iteration in the keys list), it assign it the value generated by build_vals
 
         :return: The modified payload dictionary
@@ -1715,8 +1715,8 @@ if __name__ == '__main__':
                         required=False
                         )
     parser.add_argument("--generate-jwk", action="store_true",
-                       help="Generate a jwk claim and insert it in the token header",
-                       required=False
+                        help="Generate a jwk claim and insert it in the token header",
+                        required=False
                         )
 
     # Parse arguments
