@@ -269,6 +269,11 @@ class Cracker:
                     """No key file to read from"""
                     self.key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
                 else:
+                    """We have a key file to read from"""
+                    if self.path_to_key:
+                        if not os.path.exists(self.path_to_key):
+                            print(f"{Bcolors.FAIL}jwtxpl: err: No such file {self.path_to_key}{Bcolors.ENDC}")
+                            sys.exit(7)
                     if self.x5u_basic or self.x5u_header_injection:
                         """Req a new cert and a new key file"""
                         if not self.path_to_key:
@@ -310,6 +315,10 @@ class Cracker:
                     self.key = ec.generate_private_key(ec_curve)
                 else:
                     """We have a key file to read from"""
+                    if self.path_to_key:
+                        if not os.path.exists(self.path_to_key):
+                            print(f"{Bcolors.FAIL}jwtxpl: err: No such file {self.path_to_key}{Bcolors.ENDC}")
+                            sys.exit(7)
                     if self.x5u_basic or self.x5u_header_injection:
                         if not self.path_to_key:
                             if self.alg[-3:] == "256":
