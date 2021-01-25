@@ -1321,8 +1321,8 @@ class Cracker:
             e_64 = jwk['e']
         except KeyError:
             return None
-        n_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(n64))
-        e_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(e64))
+        n_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(n_64))
+        e_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(e_64))
         n = int.from_bytes(n_bytes, byteorder="big")
         e = int.from_bytes(e_bytes, byteorder="big")
         public_numbers = RSAPublicNumbers(e, n)
