@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.8
+#!/usr/bin/python3
 
 """
     A tool to test the security of JWTs.
@@ -289,7 +289,7 @@ class Cracker:
                             sys.exit(7)
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
                     if not isinstance(self.key, _RSAPrivateKey):
-                        print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. You should not use EC keys with RS*/PS*{Bcolors.ENDC}")
+                        print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. Key is not a private key or it's not RSA{Bcolors.ENDC}")
                         sys.exit(2)
                 """Extract public key"""
                 self.key.pub = self.key.public_key()
@@ -339,7 +339,7 @@ class Cracker:
                             sys.exit(7)
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
                     if not isinstance(self.key, _EllipticCurvePrivateKey):
-                        print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. You should not use RSA keys with ES*{Bcolors.FAIL}")
+                        print(f"{Bcolors.FAIL}jwtxpl: err: Alg/Key mismatch. Key is not a private key or it's not EC{Bcolors.FAIL}")
                         sys.exit(2)
                 "Extract the public key and public numbers"
                 self.key.pub = self.key.public_key()
