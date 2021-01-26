@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3.8
 
 """
     A tool to test the security of JWTs.
@@ -440,7 +440,7 @@ class Cracker:
                 if key is None:
                     cert = Cracker.read_pem_certificate(self.verify_token_with)
                     if cert is None:
-                        print(f"{Bcolors.FAIL}jwtxpl: err: key/cert file is not PEM format{Bcolors.ENDC}")
+                        print(f"{Bcolors.FAIL}jwtxpl: err: key/cert file is not PEM format or is a private key{Bcolors.ENDC}")
                         sys.exit(6)
                     key = cert.public_key()
                 verified = Cracker.verify_token_with_rsa_pkcs1(key, self.token, sign_hash)
@@ -449,7 +449,7 @@ class Cracker:
                 if key is None:
                     cert = Cracker.read_pem_certificate(self.verify_token_with)
                     if cert is None:
-                        print(f"{Bcolors.FAIL}jwtxpl: err: key/cert file is not PEM format{Bcolors.ENDC}")
+                        print(f"{Bcolors.FAIL}jwtxpl: err: key/cert file is not PEM format or is a private key{Bcolors.ENDC}")
                         sys.exit(6)
                     key = cert.public_key()
                 verified = Cracker.verify_token_with_rsa_pss(key, self.token, sign_hash)
@@ -458,7 +458,7 @@ class Cracker:
                 if key is None:
                     cert = Cracker.read_pem_certificate(self.verify_token_with)
                     if cert is None:
-                        print(f"{Bcolors.FAIL}jwtxpl: err: key/cert file is not PEM format{Bcolors.ENDC}")
+                        print(f"{Bcolors.FAIL}jwtxpl: err: key/cert file is not PEM format or is a private key{Bcolors.ENDC}")
                         sys.exit(6)
                     key = cert.public_key()
                 verified = Cracker.verify_token_with_ec(key, self.token, sign_hash)
