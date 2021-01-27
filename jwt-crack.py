@@ -297,7 +297,6 @@ class Cracker:
                 self.key.pub.e = self.key.pub.public_numbers().e
                 self.key.pub.n = self.key.pub.public_numbers().n
             elif self.alg[:2] == "ES":
-                print(f"{Bcolors.WARNING}jwtxpl: warn: ES* support is under developement. Open issues if you find any{Bcolors.ENDC}")
                 """Check for key conflicts"""
                 if any(self.cant_asymmetric_args):
                     print(f"{Bcolors.FAIL}jwtxpl: err: You passed some arg not compatible with ES*{Bcolors.ENDC}")
