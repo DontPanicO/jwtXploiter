@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 for_all="$1"
 script_name="jwt-crack.py"
 main_path="$(realpath $0)"
@@ -12,15 +11,12 @@ bintool="jwtxpl"
 
 if [[ $1 == "" ]]; then
     if [ ! -d "$HOME/.local/bin" ]; then
-        mkdir "$HOME/bin"
-        echo "export PATH=$PATH:$HOME/bin" >> $HOME/.bashrc
-        bindir="$HOME/bin"
-    else
-        if [[ ! $PATH == *"/.local/bin"* ]]; then
-            echo "export PATH=$PATH:/$HOME/.local/bin" >> $HOME/.bashrc
-        fi
-        bindir="$HOME/.local/bin"
+        mkdir "$HOME/.local/bin"
     fi
+    if [[ ! $PATH == *"/.local/bin"* ]]; then
+        echo "export PATH=$PATH:/$HOME/.local/bin" >> $HOME/.bashrc
+    fi
+    bindir="$HOME/.local/bin"
     chmod u+x $tool_path
     python3 -m pip install -r $req_path
     ln -s $tool_path $bindir/$bintool
