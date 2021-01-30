@@ -1618,7 +1618,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         usage=Cracker.usage,
         description=Cracker.description,
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Read the wiki at https://github.com/DontPanicO/jwtXploiter/wiki"
     )
 
     # Add the arguments
