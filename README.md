@@ -1,23 +1,31 @@
 # jwtXploiter
 A tool to test the security of json web token.
-The tool is under developement, plese open issues when you run into errors.
+The tool is under development, plese open issues when you run into errors.
 
 ### Wiki
 [Beta wiki](https://github.com/DontPanicO/jwtXploiter/wiki)
 
-### Installation
+### Install with rpm
+
+- Download the rpm package:
+  - wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter-1.0-1.noarch.rpm
+
+- Install:
+  - sudo rpm --install jwtxploiter-1.0-1.noarch.rpm
+
+### Install using git
+N.B. This options should be used only for development purposes.
 
 - Clone the repo:
-
   - git clone https://github.com/DontPanicO/jwtXploiter.git
 
-- Run install.sh:
+- Run installation script:
+  - ./install.sh      (Install for the current user only)
+  - ./install.sh all  (Install for all users)
 
-  - ./install.sh (or './install.sh all' to install it for all users)
+### Install with dpkg
 
-- Now you can use the script with this syntax:
-
-  - jwtxpl \<token\> [OPTIONS]
+A DEBIAN PACKAGE WILL BE RELEASED SOON.
 
 ### Who this tool is written for?
 
@@ -36,7 +44,8 @@ The tool is under developement, plese open issues when you run into errors.
 
 ### To Know
 
-- For attacks that generates a jwks file you will find it under the crafted/ directory.
+- For attacks that generates a jwks file, you could find it in the current working directory. Remeber to deletes such files
+  in order to avoid conflicts.
 
 - For jku/x5u injection that needs to merge two urls (the server vulnerable url and your one), the HERE keyword is required.
 - For redirect attacks the keyword should replace the redirect url, e.g.

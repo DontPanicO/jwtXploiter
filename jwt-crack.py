@@ -636,7 +636,7 @@ class Cracker:
 
         Gets the jwks.json file from the url specified in the jku header. Then loads the file as json in order to
         accesses it to change the modulus and the exponent with the ones of our generated key. Then creates a new
-        file named jwks.json in the crafted/ directory and writes the dump of the jwks dict into it.
+        file named jwks.json in the current working directory and writes the dump of the jwks dict into it.
         """
         filename = "jwtxpl_jwks.json"
         command = f"wget -O {filename} " + header['jku']
@@ -724,7 +724,7 @@ class Cracker:
 
         Gets the jwks.json file from the url specified in the x5u header. Then loads the file as json in order to
         access it and changes the x5c (the X509 cert) with our generated one. Then creates a file named jwks.json
-        under the crafted/ directory and write the dump of the jwks dict into it.
+        in the current working directory and write the dump of the jwks dict into it.
         """
         filename = "jwtxpl_jwks.json"
         command = f"wget -O {filename} " + header['x5u']
