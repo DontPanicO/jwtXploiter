@@ -1444,14 +1444,26 @@ class Cracker:
         if "," in string:
             values = string.split(",")
             for i in range(len(values)):
+                if values[i].startswith("%"):
+                    values[i] = values[i].lstrip("%")
+                    continue
                 if values[i] == "":
                     values.remove(values[i])
+                    continue
                 if values[i] == "null":
                     values[i] = None
+                    continue
+                try:
+                    values[i] = int(values[i])
+                except ValueError:
+                    continue
             return values
         if string == "null":
             return None
-        return string
+        try:
+            return int(string)
+        except ValueError:
+            return string.lstrip("%")
 
     @staticmethod
     def change_payload_complex(string, iterable):
@@ -1624,7 +1636,8 @@ if __name__ == '__main__':
                         )
     parser.add_argument("-p", "--payload",
                         action="append", nargs="+",
-                        help="A claim you want to change in the payload and the value to issue, as key:value pairs. If value have to be a list, pass list items as comma separated values.",
+                        help="A claim you want to change in the payload and the value to issue, as key:value pairs. If value have to be a list, pass list items as comma separated values. " \
+                        "Numeric strings are always converted to integers. If you need to preserve the string data type, precedes it with a percent sign. It will be stripped and the string won't be converted to int",
                         metavar="<key>:<value>", required=False
                         )
     parser.add_argument("-d", "--decode", action="store_true",
@@ -1648,7 +1661,8 @@ if __name__ == '__main__':
                         metavar="<keyfile>", required=False
                         )
     parser.add_argument("--complex-payload", action="append", nargs="+",
-                        help="As --payload but for subclaims. Keys must be comma separated, and passed in cronological order. If value have to be a list, pass the list items as comma separated values",
+                        help="As --payload but for subclaims. Keys must be comma separated, and passed in cronological order. If value have to be a list, pass the list items as comma separated values. " \
+                        "Numeric strings are always converted to integers. If you need to preserve the string data type, precedes it with a percent sign. It will be stripped and the string won't be converted to int",
                         metavar="<key,key...>:<value>", required=False
                         )
     parser.add_argument("--remove-from", action="append", nargs="+",
