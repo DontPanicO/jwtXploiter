@@ -2,6 +2,8 @@
 A tool to test the security of json web token.
 The tool is under development, plese open issues when you run into errors.
 
+[![Python 3.7|3.9](https://img.shields.io/badge/python-3.7|3.9-blue.svg)](https://www.python.org/) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-red.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 ### Wiki
 [Beta wiki](https://github.com/DontPanicO/jwtXploiter/wiki)
 
