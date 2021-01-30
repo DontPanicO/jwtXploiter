@@ -50,8 +50,6 @@ except ModuleNotFoundError:
     sys.exit(11)
 
 
-CWD = os.path.dirname(__file__) + "/"
-
 
 class Bcolors:
     """
@@ -672,9 +670,9 @@ class Cracker:
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
-        with open(f"{CWD}crafted/jwks.json", 'w'):
-            file.write(json.dumps(jwks_dict, indent=4))
         os.remove(filename)
+        with open("jwks.json", 'w'):
+            file.write(json.dumps(jwks_dict, indent=4))
 
     def jku_via_header_injection(self, header):
         """
@@ -759,9 +757,9 @@ class Cracker:
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
-        with open(f"{CWD}crafted/jwks.json", 'w'):
-            file.write(json.dumps(jwks_dict, indent=4))
         os.remove(filename)
+        with open("jwks.json", 'w'):
+            file.write(json.dumps(jwks_dict, indent=4))
 
     def x5u_via_header_injection(self, header):
         """
