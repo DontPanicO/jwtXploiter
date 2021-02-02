@@ -16,6 +16,7 @@ Test a JWT against all known CVEs;
 
 ### Installation
 N.B. Cloning the repository should be avoided except for development purposes!
+N.B. Deb package has to be considered beta
 
 - With rpm:
   - wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter-1.0-1.noarch.rpm
@@ -24,11 +25,13 @@ N.B. Cloning the repository should be avoided except for development purposes!
 - With pip:
   - pip install jwtxploiter
 
+- With deb:
+  - wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter_1.0-1_all.deb
+  - sudo dpkg -i jwtxploiter_1.0-1_all.deb
+
 - Cloing the repo:
   - git clone https://github.com/DontPanicO/jwtXploiter.git
   - ./install.sh
-
-- A deb package will be provided soon!
 
 ### Who this tool is written for?
 
