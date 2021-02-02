@@ -46,7 +46,7 @@ try:
     from cryptography.hazmat.backends.openssl.ec import _EllipticCurvePublicKey, _EllipticCurvePrivateKey
     from cryptography.exceptions import InvalidSignature
 except ModuleNotFoundError:
-    print(f"jwtxpl: error: Missing dependencies\nRun ./install.sh or pip3 install -r requirements.txt")
+    print(f"jwtxpl: error: missing dependencies: pip3 install -r requirements.txt")
     sys.exit(11)
 
 
@@ -72,8 +72,7 @@ class Cracker:
     description = "A command line tool for test security of JWTs"
 
     usage = """
-        python3 jwt-crack.py <token> [OPTIONS]; OR
-        jwtxpl <token> [OPTIONS]; IF YOU HAVE USED install.sh
+        jwtxpl <token> [OPTIONS]
     """
     command = ["jwtxpl"] + [sys.argv[i] for i in range(1, len(sys.argv))]
 
