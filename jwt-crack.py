@@ -1479,7 +1479,7 @@ class Cracker:
         keys = Cracker.build_keys(string.split(":")[0].strip(","))
         vals = Cracker.build_values(string.split(":")[1].lstrip(","))
         if not isinstance(keys, list) and not len(keys) > 1:
-            print(f"{Bcolors.FAIL}jwt: error: can't split keys basing on ','. If you can access the claim using a single key, pleas use --payload{Bcolors.ENDC}")
+            print(f"{Bcolors.FAIL}jwtxpl: error: can't split keys basing on ','. If you can access the claim using a single key, pleas use --payload{Bcolors.ENDC}")
             sys.exit(5)
         i = 0
         for key in keys:
