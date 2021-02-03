@@ -11,9 +11,8 @@ Test a JWT against all known CVEs;
 - Generates a JWK and insert it in the token header
 - And much, much more!
 
-[![Python 3.7|3.9](https://img.shields.io/badge/python-3.7|3.9-blue.svg)](https://www.python.org/) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-red.svg)](https://www.gnu.org/licenses/gpl-3.0)
-
 ### Wiki
++ Read the wiki!
 [wiki](https://github.com/DontPanicO/jwtXploiter/wiki)
 
 ### Installation
