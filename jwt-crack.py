@@ -84,7 +84,7 @@ class Cracker:
 
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
-                 sub_time, add_time, unverified=False, blank=False, decode=False, manual=False, generate_jwk=False):
+                 sub_time, add_time, find_key_from_jwks, unverified=False, blank=False, decode=False, manual=False, generate_jwk=False):
         """
         :param token: The user input token -> str
         :param alg: The algorithm for the attack. HS256 or None -> str
@@ -139,12 +139,14 @@ class Cracker:
         self.verify_token_with = verify_token_with
         self.sub_time = sub_time
         self.add_time = add_time
+        self.find_key_from_jwks = find_key_from_jwks
         self.unverified = unverified
         self.blank = blank
         self.decode = decode
         self.manual = manual
         self.generate_jwk = generate_jwk
         """Groups args based on requirements"""
+        self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode]
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
         self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key, self.blank]
         self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
@@ -244,7 +246,7 @@ class Cracker:
                 print(f"{Bcolors.WARNING}jwtxpl: warn: alg must be RSA or EC with jwks args: it will be forced to RS256{Bcolors.ENDC}")
                 self.alg = "RS256"
         """Validate key"""
-        if not self.decode and not self.verify_token_with:
+        if not any(self.no_key_validation_args):
             """--manual can be used only with --jku-basic or --x5u-basic"""
             if self.manual:
                 if not self.jku_basic and not self.x5u_basic:
@@ -399,8 +401,8 @@ class Cracker:
                       self.exec_via_kid, self.specified_key, self.jku_basic,
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
                       self.x5u_header_injection, self.verify_token_with,
-                      self.sub_time, self.add_time, self.unverified,
-                      self.manual, self.generate_jwk
+                      self.sub_time, self.add_time, self.find_key_from_jwks,
+                      self.unverified, self.manual, self.generate_jwk
         ]
         if any(arg for arg in other_args):
             print(f"{Bcolors.WARNING}jwtxpl: warn: you have not to specify any other argument if you want to decode the token{Bcolors.ENDC}")
@@ -424,8 +426,8 @@ class Cracker:
                       self.exec_via_kid, self.specified_key, self.jku_basic,
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
                       self.x5u_header_injection, self.sub_time, self.add_time,
-                      self.unverified, self.decode, self.manual,
-                      self.generate_jwk
+                      self.find_key_from_jwks, self.unverified, self.decode,
+                      self.manual, self.generate_jwk
         ]
         if any(arg for arg in other_args):
             print(f"{Bcolors.WARNING}jwtxpl: warn: only the alg is required to verify the signature{Bcolors.ENDC}")
@@ -467,6 +469,26 @@ class Cracker:
             sys.exit(2)
         result = f"Verified with {self.verify_token_with}" if verified else f"Unverified with {self.verify_token_with}"
         print(f"{Bcolors.HEADER}Token:{Bcolors.ENDC} {Bcolors.OKCYAN}{result}{Bcolors.ENDC}")
+        sys.exit(0)
+
+    def find_verifier_key_from_jwks_and_quit(self):
+        if not os.path.exists(self.find_key_from_jwks):
+            print(f"{Bcolors.FAIL}jwtxpl: error: no such file {self.find_key_from_jwks}{Bcolors.ENDC}")
+            sys.exit(7)
+        try:
+            with open(self.find_key_from_jwks) as jwks_file:
+                jwks_dict = json.load(jwks_file)
+        except json.decoder.JSONDecodeError:
+            print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
+            sys.exit(1)
+        sign_hash = Cracker.get_sign_hash(self.alg)
+        index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
+        if index is None:
+            print(f"{Bcolors.OKBLUE}No keys from {self.find_key_from_jwk} can verify token signature{Bcolors.ENDC}")
+            sys.exit(0)
+        result = json.dumps(jwks_dict, indent=2)
+        print(f"{Bcolors.HEADER}Found verifier key:{Bcolors.ENDC}")
+        print(f"{Bcolors.OKCYAN}{result}{Bcolors.ENDC}")
         sys.exit(0)
 
     def modify_header_and_payload(self):
@@ -1736,6 +1758,10 @@ if __name__ == '__main__':
                         help="Generate a jwk claim and insert it in the token header",
                         required=False
                         )
+    parser.add_argument("--find-key-from-jwks",
+                        help="Parse a jwks file in order to find the key used to veirfy the token",
+                        metavar="<jwks>", required=False,
+                        )
 
     # Parse arguments
     args = parser.parse_args()
@@ -1743,7 +1769,8 @@ if __name__ == '__main__':
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
-        args.verify_token_with, args.subtract_time, args.add_time, args.unverified, args.blank, args.decode, args.manual, args.generate_jwk,
+        args.verify_token_with, args.subtract_time, args.add_time, args.find_key_from_jwks, args.unverified, args.blank, args.decode,
+        args.manual, args.generate_jwk,
     )
 
     # Start the cracker
