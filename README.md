@@ -1,33 +1,47 @@
-# jwtXploiter
-A tool to test the security of json web token.
-The tool is under development, plese open issues when you run into errors.
+[![Python 3.7|3.9](https://img.shields.io/badge/python-3.7|3.9-blue.svg)](https://www.python.org/) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-red.svg)](https://www.gnu.org/licenses/gpl-3.0) [![release 1.0](https://img.shields.io/badge/release-1.0-yellow.svg)](https://github.com/DontPanicO/jwtXploiter/releases/tag/v1.0) [![pypi 1.0](https://img.shields.io/badge/pypi-1.0-purple.svg)](https://pypi.org/project/jwtxploiter/)
+
+### jwtXploiter
+A tool to test security of JSON Web Tokens.
+Test a JWT against all known CVEs;
+- Tamper with the token payload: changes claims and subclaims values.
+- Exploit known vulnerable header claims (kid, jku, x5u)
+- Verify a token
+- Retrieve the public key of your target's ssl connection and try to use it in a key confusion attack with one option only
+- All JWAs supported
+- Generates a JWK and insert it in the token header
+- And much, much more!
 
 [![Python 3.7|3.9](https://img.shields.io/badge/python-3.7|3.9-blue.svg)](https://www.python.org/) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-red.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 ### Wiki
-[Beta wiki](https://github.com/DontPanicO/jwtXploiter/wiki)
+[wiki](https://github.com/DontPanicO/jwtXploiter/wiki)
 
-### Install with rpm
+### Installation
+N.B. Cloning the repository should be avoided except for development purposes!
+N.B. Deb package has to be considered beta
 
-- Download the rpm package:
-  - wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter-1.0-1.noarch.rpm
++ With rpm:
+  ```console
+  wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter-1.0-1.noarch.rpm
+  sudo rpm --install jwtxploiter-1.0-1.noarch.rpm
+  ```
 
-- Install:
-  - sudo rpm --install jwtxploiter-1.0-1.noarch.rpm
++ With pip:
+  ```console
+  sudo pip install jwtxploiter
+  ```
 
-### Install using git
-N.B. This options should be used only for development purposes.
++ With deb:
+  ```console
+  wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter_1.0-1_all.deb
+  sudo dpkg -i jwtxploiter_1.0-1_all.deb
+  ```
 
-- Clone the repo:
-  - git clone https://github.com/DontPanicO/jwtXploiter.git
-
-- Run installation script:
-  - ./install.sh      (Install for the current user only)
-  - ./install.sh all  (Install for all users)
-
-### Install with dpkg
-
-A DEBIAN PACKAGE WILL BE RELEASED SOON.
++ Cloing the repo:
+  ```console
+  git clone https://github.com/DontPanicO/jwtXploiter.git
+  ./install.sh
+  ```
 
 ### Who this tool is written for?
 
@@ -63,4 +77,4 @@ A DEBIAN PACKAGE WILL BE RELEASED SOON.
   so, you will need to manually craft the url and pass it to those options, even for attacks that exploit Open Redirect or
   HTTP header injection.
 
-- Look at the docs for more detailed examples.
+- Look at the wiki for a detailed documentation.
