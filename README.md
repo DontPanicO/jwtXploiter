@@ -19,27 +19,27 @@ N.B. Cloning the repository should be avoided except for development purposes!
 N.B. Deb package has to be considered beta
 
 + With rpm:
-  '''console
+  ```console
   wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter-1.0-1.noarch.rpm
   sudo rpm --install jwtxploiter-1.0-1.noarch.rpm
-  '''
+  ```
 
 + With pip:
-  '''console
+  ```console
   sudo pip install jwtxploiter
-  '''
+  ```
 
 + With deb:
-  '''console
+  ```console
   wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter_1.0-1_all.deb
   sudo dpkg -i jwtxploiter_1.0-1_all.deb
-  '''
+  ```
 
 + Cloing the repo:
-  '''console
+  ```console
   git clone https://github.com/DontPanicO/jwtXploiter.git
   ./install.sh
-  '''
+  ```
 
 ### Who this tool is written for?
 
