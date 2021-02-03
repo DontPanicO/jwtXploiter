@@ -1651,8 +1651,8 @@ if __name__ == '__main__':
     parser.add_argument("-p", "--payload",
                         action="append", nargs="+",
                         help="A claim you want to change in the payload and the value to issue, as key:value pairs. In order to access subclaims key have to be the set of keys, cronologically displayed " \
-                        "and comma separated, necessaries for access the subclaim value. In order to provide a list of values, pass those values, separated by commas, as the value in the key:value parir." \
-                        "By defaul numeric string (strings representing numbers) are always converted to integers. If you need to preserve the string data type, put a percent sign in front them." \
+                        "and comma separated, necessaries for access the subclaim value. In order to provide a list of values, pass those values, separated by commas, as the value in the key:value parir. " \
+                        "By defaul numeric string (strings representing numbers) are always converted to integers. If you need to preserve the string data type, put a percent sign in front them. " \
                         "This will tell the tool to not convert the numeric string to integer. Of course, percent signs that precede numeric strings will be stripped",
                         metavar="<key,key...>:<value...>", required=False
                         )
