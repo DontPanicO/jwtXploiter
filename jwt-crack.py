@@ -39,7 +39,7 @@ try:
     from cryptography.hazmat.primitives.asymmetric import padding, rsa, ec
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
     from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicNumbers
-    from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
+    from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key, Encoding, PrivateFormat, PublicFormat, NoEncryption
     from cryptography.x509 import load_pem_x509_certificate
     from cryptography.hazmat.backends.openssl import backend
     from cryptography.hazmat.backends.openssl.rsa import _RSAPublicKey, _RSAPrivateKey
@@ -84,7 +84,8 @@ class Cracker:
 
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
-                 sub_time, add_time, find_key_from_jwks, unverified=False, blank=False, decode=False, manual=False, generate_jwk=False):
+                 sub_time, add_time, find_key_from_jwks, unverified=False, blank=False, decode=False, manual=False,
+                 generate_jwk=False, dump_key=False):
         """
         :param token: The user input token -> str
         :param alg: The algorithm for the attack. HS256 or None -> str
@@ -105,11 +106,13 @@ class Cracker:
         :param verify_token_with: The file of the public key to be used for verification -> str
         :param sub_time: Hours to subtract from time claims if any -> str
         :param add_time: Hours to add to time claims if any -> str
+        :param find_key_from_jwks: Path to JWKS file -> str
         :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool
         :param blank: A flag to set if the key has to be an empty string -> Bool
         :param decode: A flag to set if the user need only to decode the token -> Bool
         :param manual: A flag to set if the user need to craft an url manually -> Bool
         :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> Bool
+        :param dump_key: A flag, if present the generated private key will be sotred in a file -> Bool
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
@@ -145,6 +148,7 @@ class Cracker:
         self.decode = decode
         self.manual = manual
         self.generate_jwk = generate_jwk
+        self.dump_key = dump_key
         """Groups args based on requirements"""
         self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode]
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
@@ -268,17 +272,24 @@ class Cracker:
                 if not any(key_read_args):
                     """No key file to read from"""
                     self.key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+                    if self.dump_key:
+                        Cracker.dump_pem_private_key(self.key, "jwtxpl_rsa_priv.pem")
+                    else:
+                        print(f"{Bcolors.WARNING}jwtxpl: warn: you should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
                 else:
                     """We have a key file to read from"""
                     if self.path_to_key:
                         if not os.path.exists(self.path_to_key):
                             print(f"{Bcolors.FAIL}jwtxpl: error: no such file: {self.path_to_key}{Bcolors.ENDC}")
                             sys.exit(7)
+                        if self.dump_key:
+                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored, since you passed a key via -k/--key")
                     if self.x5u_basic or self.x5u_header_injection:
                         """Req a new cert and a new key file"""
                         if not self.path_to_key:
-                            x5u_command = 'openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                            self.path_to_key = "key.pem"
+                            keyout = "jwtxpl_rsa_priv.pem" if self.dump_key else "key.pem"
+                            x5u_command = f'openssl req -newkey rsa:2048 -nodes -keyout {keyout} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
+                            self.path_to_key = keyout
                         else:
                             x5u_command = f'openssl req -key {self.path_to_key} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
                         try:
@@ -312,12 +323,18 @@ class Cracker:
                     """We have no key file to read from"""
                     ec_curve = Cracker.get_ec_curve(self.alg)
                     self.key = ec.generate_private_key(ec_curve)
+                    if self.dump_key:
+                        Cracker.dump_pem_private_key(self.key, "jwtxpl_ec_private.pem")
+                    else:
+                        print(f"{Bcolors.WARNING}jwtxpl: warn: ou should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
                 else:
                     """We have a key file to read from"""
                     if self.path_to_key:
                         if not os.path.exists(self.path_to_key):
                             print(f"{Bcolors.FAIL}jwtxpl: error: no such file: {self.path_to_key}{Bcolors.ENDC}")
                             sys.exit(7)
+                        if self.dump_key:
+                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored, since you passed a key via -k/--key")
                     if self.x5u_basic or self.x5u_header_injection:
                         if not self.path_to_key:
                             if self.alg[-3:] == "256":
@@ -326,8 +343,9 @@ class Cracker:
                                 curve = "secp384r1"
                             elif self.alg[-3:] == "512":
                                 curve = "secp521r1"
-                            x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout key.pem -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                            self.path_to_key = "key.pem"
+                            keyout = "jwtxpl_ec_priv.pem" if self.dump_key else "key.pem"
+                            x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout {keyout} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
+                            self.path_to_key = keyout
                         else:
                             x5u_command = f'openssl req -key {self.path_to_key} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
                         try:
@@ -345,7 +363,7 @@ class Cracker:
                 self.key.pub.y = self.key.pub.public_numbers().y
             elif self.alg[:2] == "HS":
                 """Check for key conflicts"""
-                if any(self.jwks_args):
+                if any(self.jwks_args + [self.dump_key]):
                     print(f"{Bcolors.FAIL}jwtxpl: error: you passed some arg not compatible with HS*{Bcolors.ENDC}")
                     sys.exit(2)
                 elif not any(self.cant_asymmetric_args + [self.path_to_key, self.unverified]):
@@ -1273,7 +1291,7 @@ class Cracker:
     @staticmethod
     def verify_token_with_ec(key, token, sign_hash):
         """
-        :param key: The key to use for signature verification -> cryptography.hazmat.backends.openssl.rsa._RSAPublicKey object
+        :param key: The key to use for signature verification -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey object
         :param token: A complete JWT -> str
         :param sign_hash: The hash method to use -> cryptography.hazmat.primitives.hashes method
 
@@ -1333,6 +1351,34 @@ class Cracker:
             except ValueError:
                 return None
         return private_key
+
+    @staticmethod
+    def dump_pem_private_key(key, path):
+        """
+        :param key: the private key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePrivateKey orcryptography.hazmat.backends.openssl.rsa._RSAPrivateKey
+        :param path: the path to the file to dump into -> str
+
+        Dumps key bytes into path
+        :return: path, if created, else None
+        """
+        key_bytes_data = key.private_bytes(encoding=Encoding.PEM, format=PrivateFormat.TraditionalOpenSSL, encryption_algorithm=NoEncryption())
+        with open(path, 'wb') as keyfile:
+            keyfile.write(key_bytes_data)
+        return path
+
+    @staticmethod
+    def dump_pem_public_key(key, path):
+        """
+        :param key: the private key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey orcryptography.hazmat.backends.openssl.rsa._RSAPublicKey
+        :param path: the path to the file to dump into -> str
+
+        Dumps key bytes into path
+        :return: path, if created, else None
+        """
+        key_bytes_data = key.public_bytes(encoding=Encoding.PEM, format=PublicFormat.SubjectPublicKeyInfo)
+        with open(path, 'wb') as keyfile:
+            keyfile.write(key_bytes_data)
+        return path
 
     @staticmethod
     def gen_rsa_public_key_from_jwk(jwk):
@@ -1700,6 +1746,11 @@ if __name__ == '__main__':
                         help="Hours to delete from time claims if any ('iat', 'exp', 'nbf'). From 1 to 24",
                         metavar="<hours>", required=False
                         )
+    parser.add_argument("-D", "--dump-key", action="store_true",
+                        help="Dumps generated private key to a file, so it can then be reused next times with -k/--key. This is due since generating new pairs for each attack has to be considered a bad practice so," \
+                        "if you have no key to use, the first time you run a test that requires one, you should use this option to generate a key file to be used next times",
+                        required=False
+                        )
     parser.add_argument("-T", "--add-time",
                         help="Hours to add to time claims if any ('iat', 'exp', 'nbf'). From 1 to 24",
                         metavar="<hours>", required=False
@@ -1780,7 +1831,7 @@ if __name__ == '__main__':
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
         args.verify_token_with, args.subtract_time, args.add_time, args.find_key_from_jwks, args.unverified, args.blank, args.decode,
-        args.manual, args.generate_jwk,
+        args.manual, args.generate_jwk, args.dump_key
     )
 
     # Start the cracker
