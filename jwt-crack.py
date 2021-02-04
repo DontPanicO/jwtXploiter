@@ -235,7 +235,7 @@ class Cracker:
                     sys.exit(2)
                 print(f"{Bcolors.OKBLUE}INFO: some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
             elif self.alg.lower()[:2] in ["rs", "ps", "ec"]:
-                if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with, self.unverified]):
+                if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with, self.find_key_from_jwks, self.unverified]):
                     print(f"{Bcolors.FAIL}jwtxpl: error: missing a valid key argument for EC/RSA{Bcolors.ENDC}")
                     sys.exit(4)
             if self.alg.lower() != "none":
@@ -472,6 +472,10 @@ class Cracker:
         sys.exit(0)
 
     def find_verifier_key_from_jwks_and_quit(self):
+        """
+        Parse a jwks file, in order to determine if one of the jwk is the one used to verify the token signature. If it find one,
+        display it to the user, than quits.
+        """
         if not os.path.exists(self.find_key_from_jwks):
             print(f"{Bcolors.FAIL}jwtxpl: error: no such file {self.find_key_from_jwks}{Bcolors.ENDC}")
             sys.exit(7)
@@ -486,7 +490,11 @@ class Cracker:
         if index is None:
             print(f"{Bcolors.OKBLUE}No keys from {self.find_key_from_jwk} can verify token signature{Bcolors.ENDC}")
             sys.exit(0)
-        result = json.dumps(jwks_dict, indent=2)
+        try:
+            result = json.dumps(jwks_dict['keys'][index], indent=2)
+        except KeyError:
+            print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
+            sys.exit(1)
         print(f"{Bcolors.HEADER}Found verifier key:{Bcolors.ENDC}")
         print(f"{Bcolors.OKCYAN}{result}{Bcolors.ENDC}")
         sys.exit(0)
@@ -1629,6 +1637,8 @@ class Cracker:
             sys.exit(4)
         if self.verify_token_with is not None:
             self.verify_and_quit()
+        if self.find_key_from_jwks is not None:
+            self.find_verifier_key_from_jwks_and_quit()
         header, payload = self.modify_header_and_payload()
         new_partial_token = Cracker.craft_token(header, payload)
         signature = self.select_signature(new_partial_token)
@@ -1698,6 +1708,10 @@ if __name__ == '__main__':
                         help="The key to verify the token with. Verify and exit",
                         metavar="<keyfile>", required=False
                         )
+    parser.add_argument("-F", "--find-key-from-jwks",
+                        help="Parse a jwks file in order to find the key used to veirfy the token",
+                        metavar="<jwks>", required=False,
+                        )
     parser.add_argument("--complex-payload", action="append", nargs="+",
                         help="Deprecated, merged with --payload. Since v1.1 --payload cover also subclaims tampering. This option is going to be removed in feature releases.",
                         metavar="<key,key...>:<value>", required=False
@@ -1757,10 +1771,6 @@ if __name__ == '__main__':
     parser.add_argument("--generate-jwk", action="store_true",
                         help="Generate a jwk claim and insert it in the token header",
                         required=False
-                        )
-    parser.add_argument("--find-key-from-jwks",
-                        help="Parse a jwks file in order to find the key used to veirfy the token",
-                        metavar="<jwks>", required=False,
                         )
 
     # Parse arguments
