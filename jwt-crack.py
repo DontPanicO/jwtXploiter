@@ -420,7 +420,7 @@ class Cracker:
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
                       self.x5u_header_injection, self.verify_token_with,
                       self.sub_time, self.add_time, self.find_key_from_jwks,
-                      self.unverified, self.manual, self.generate_jwk
+                      self.unverified, self.manual, self.generate_jwk, self.dump_key
         ]
         if any(arg for arg in other_args):
             print(f"{Bcolors.WARNING}jwtxpl: warn: you have not to specify any other argument if you want to decode the token{Bcolors.ENDC}")
@@ -445,10 +445,10 @@ class Cracker:
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
                       self.x5u_header_injection, self.sub_time, self.add_time,
                       self.find_key_from_jwks, self.unverified, self.decode,
-                      self.manual, self.generate_jwk
+                      self.manual, self.generate_jwk, self.dump_key
         ]
         if any(arg for arg in other_args):
-            print(f"{Bcolors.WARNING}jwtxpl: warn: only the alg is required to verify the signature{Bcolors.ENDC}")
+            print(f"{Bcolors.WARNING}jwtxpl: warn: only the alg is required with verification{Bcolors.ENDC}")
         sign_hash = Cracker.get_sign_hash(self.alg)
         try:
             if self.alg[:2] == "RS":
@@ -494,6 +494,17 @@ class Cracker:
         Parse a jwks file, in order to determine if one of the jwk is the one used to verify the token signature. If it find one,
         display it to the user, than quits.
         """
+        other_args = other_args = [
+                      self.path_to_key, self.user_payload, self.complex_payload,
+                      self.remove_from, self.add_into, self.auto_try, self.kid,
+                      self.exec_via_kid, self.specified_key, self.jku_basic,
+                      self.jku_redirect, self.jku_header_injection, self.x5u_basic,
+                      self.x5u_header_injection, self.verify_token_with,
+                      self.sub_time, self.add_time, self.unverified, self.decode,
+                      self.manual, self.generate_jwk, self.dump_key
+        ]
+        if any(arg for arg in other_args):
+            print(f"{Bcolors.WARNING}jwtxpl: warn: only the alg is required with verification{Bcolors.ENDC}")
         if not os.path.exists(self.find_key_from_jwks):
             print(f"{Bcolors.FAIL}jwtxpl: error: no such file {self.find_key_from_jwks}{Bcolors.ENDC}")
             sys.exit(7)
