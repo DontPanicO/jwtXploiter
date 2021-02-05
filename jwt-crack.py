@@ -283,7 +283,7 @@ class Cracker:
                             print(f"{Bcolors.FAIL}jwtxpl: error: no such file: {self.path_to_key}{Bcolors.ENDC}")
                             sys.exit(7)
                         if self.dump_key:
-                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored, since you passed a key via -k/--key")
+                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored since you passed a key via -k/--key{Bcolors.ENDC}")
                     if self.x5u_basic or self.x5u_header_injection:
                         """Req a new cert and a new key file"""
                         if not self.path_to_key:
@@ -334,7 +334,7 @@ class Cracker:
                             print(f"{Bcolors.FAIL}jwtxpl: error: no such file: {self.path_to_key}{Bcolors.ENDC}")
                             sys.exit(7)
                         if self.dump_key:
-                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored, since you passed a key via -k/--key")
+                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored since you passed a key via -k/--key{Bcolors.ENDC}")
                     if self.x5u_basic or self.x5u_header_injection:
                         if not self.path_to_key:
                             if self.alg[-3:] == "256":
