@@ -1591,10 +1591,13 @@ class Cracker:
                             keys_path[key] = vals
                             break
                         keys_path = keys_path[key]
-                    i += 1
-                except (KeyError, TypeError):
+                except KeyError:
                     keys_path[key] = dict()
                     keys_path = keys_path[key]
+                except TypeError:
+                    print(f"{Bcolors.FAIL}jwtxpl: error: subclaim does not exists. You can change subclaims values or build new complex claims from scratch, but not convert data types{Bcolors.ENDC}")
+                    sys.exit(6)
+                finally:
                     i += 1
         return iterable
 
