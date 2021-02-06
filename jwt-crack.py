@@ -368,7 +368,7 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: error: too many key related args{Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
-                if self.dump_key is not None:
+                if self.dump_key:
                     print(f"{Bcolors.WARNING}jwtxpl: error: no keys generated with HS*, dumping ignored{Bcolors.ENDC}")
                 if self.auto_try is not None:
                     path = Cracker.get_key_from_ssl_cert(self.auto_try)
