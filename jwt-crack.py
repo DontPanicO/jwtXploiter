@@ -244,11 +244,6 @@ class Cracker:
                     sys.exit(4)
             if self.alg.lower() != "none":
                 self.alg = self.alg.upper()
-        """Force self.alg to RS256 for jku attacks if a non RSA/EC alg has been selected"""
-        if any(arg for arg in self.jwks_args):
-            if self.alg is not None and self.alg[:2] not in ["RS", "PS", "ES"]:
-                print(f"{Bcolors.WARNING}jwtxpl: warn: alg must be RSA or EC with jwks args: it will be forced to RS256{Bcolors.ENDC}")
-                self.alg = "RS256"
         """Validate key"""
         if not any(self.no_key_validation_args):
             """--manual can be used only with --jku-basic or --x5u-basic"""
@@ -809,11 +804,19 @@ class Cracker:
             else:
                 jwks_dict['keys'][index]['x5c'] = x5c_
             if self.alg[:2] in ["RS", "PS"]:
-                jwks_dict['keys'][index]['n'] = self.key.pub.n
-                jwks_dict['keys'][index]['e'] = self.key.pub.e
+                jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
+                    self.key.pub.n.to_bytes(self.key.pub.n.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+                jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
+                    self.key.pub.e.to_bytes(self.key.pub.e.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
             elif self.alg[:2] == "ES":
-                jwks_dict['keys'][index]['x'] = self.key.pub.x
-                jwks_dict['keys'][index]['y'] = self.key.pub.y
+                jwks_dict['keys'][index]['x'] = base64.urlsafe_b64encode(
+                    self.key.pub.x.to_bytes(self.key.pub.x.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+                jwks_dict['keys'][index]['y'] = base64.urlsafe_b64encode(
+                    self.key.pub.y.to_bytes(self.key.pub.y.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
             # Need an else? Even if alg has already been validated???
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
@@ -853,11 +856,19 @@ class Cracker:
             else:
                 jwks_dict['keys'][index]['x5c'] = x5c_
             if self.alg[:2] in ["RS", "PS"]:
-                jwks_dict['keys'][index]['n'] = self.pub.n
-                jwks_dict['keys'][index]['e'] = self.pub.e
+                jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
+                    self.key.pub.n.to_bytes(self.key.pub.n.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+                jwks_dict['keys'][index]['e'] = base64.urlsafe_b64encode(
+                    self.key.pub.e.to_bytes(self.key.pub.e.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
             elif self.alg[:2] == "ES":
-                jwks_dict['keys'][index]['x'] = self.pub.x
-                jwks_dict['keys'][index]['y'] = self.pub.y
+                jwks_dict['keys'][index]['x'] = base64.urlsafe_b64encode(
+                    self.key.pub.x.to_bytes(self.key.pub.x.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
+                jwks_dict['keys'][index]['y'] = base64.urlsafe_b64encode(
+                    self.key.pub.y.to_bytes(self.key.pub.y.bit_length() // 8 + 1, byteorder='big')
+                ).decode('utf-8').rstrip("=")
         except (TypeError, IndexError):
             print(f"{Bcolors.FAIL}jwtxpl: error: Non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
@@ -1655,15 +1666,25 @@ class Cracker:
 
         :return: The generated jwk
         """
+        n_or_x = public_numbers[0]
+        e_or_y = public_numbers[1]
         jwk = dict()
         if jwa[:2] in ["RS", "PS"]:
             jwk['kty'] = "RSA"
-            jwk['n'] = public_numbers[0]
-            jwk['e'] = public_numbers[1]
+            jwk['n'] = base64.urlsafe_b64encode(
+                n_or_x.to_bytes(n_or_x.bit_length() // 8 + 1, byteorder='big')
+            ).decode('utf-8').rstrip("=")
+            jwk['e'] = base64.urlsafe_b64encode(
+                e_or_y.to_bytes(e_or_y.bit_length() // 8 + 1, byteorder='big')
+            ).decode('utf-8').rstrip("=")
         elif jwa[:2] == "ES":
             jwk['kty'] = "EC"
-            jwk['x'] = public_numbers[0]
-            jwk['y'] = public_numbers[1]
+            jwk['x'] = base64.urlsafe_b64encode(
+                n_or_x.to_bytes(n_or_x.bit_length() // 8 + 1, byteorder='big')
+            ).decode('utf-8').rstrip("=")
+            jwk['y'] = base64.urlsafe_b64encode(
+                e_or_y.to_bytes(e_or_y.bit_length() // 8 + 1, byteorder='big')
+            ).decode('utf-8').rstrip("=")
         jwk['kid'] = kid
         jwk['use'] = "sig"
         jwk['alg'] = jwa
