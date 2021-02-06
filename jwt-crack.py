@@ -363,7 +363,7 @@ class Cracker:
                 self.key.pub.y = self.key.pub.public_numbers().y
             elif self.alg[:2] == "HS":
                 """Check for key conflicts"""
-                if any(self.jwks_args + [self.dump_key]):
+                if any(self.jwks_args):
                     print(f"{Bcolors.FAIL}jwtxpl: error: you passed some arg not compatible with HS*{Bcolors.ENDC}")
                     sys.exit(2)
                 elif not any(self.cant_asymmetric_args + [self.path_to_key, self.unverified]):
@@ -373,6 +373,8 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: error: too many key related args{Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
+                if self.dump_key is not None:
+                    print(f"{Bcolors.WARNING}jwtxpl: error: no keys generated with HS*, dumping ignored{Bcolors.ENDC}")
                 if self.auto_try is not None:
                     path = Cracker.get_key_from_ssl_cert(self.auto_try)
                     self.path_to_key = path
@@ -1761,8 +1763,8 @@ if __name__ == '__main__':
                         metavar="<hours>", required=False
                         )
     parser.add_argument("-D", "--dump-key", action="store_true",
-                        help="Dumps generated private key to a file, so it can then be reused next times with -k/--key. This is due since generating new pairs for each attack has to be considered a bad practice so," \
-                        "if you have no key to use, the first time you run a test that requires one, you should use this option to generate a key file to be used next times",
+                        help="Dumps generated private key to a file, so it can then be reused next times with -k/--key. This is due since some attacks support key " \
+                        "generation, that's a resource-consuming task and should be avoided as far as possible",
                         required=False
                         )
     parser.add_argument("-T", "--add-time",

@@ -44,18 +44,24 @@ N.B. Deb package has to be considered beta
 
 ### Who this tool is written for?
 
-- Web Application Penetration Tester / Bug Bounty Hunters
++ Web Application Penetration Tester / Bug Bounty Hunters
 
   - This tool has been written with the aim of become a key part of pentesters toolkit.
 
-- Devs who need to test the secuirty of JWTs used in their applications
++ Devs who need to test the secuirty of JWTs used in their applications
 
-- CTF Players
++ CTF Players
 
-- Not For Students
++ Not For Students
 
   - Since this tool automates lot of stuff, without force the user to know what's happening under the hood, it won't
     help you to understand the vulnerabilities it exploits.
+
+### Python cryptography version
+
++ cryptography >= 3.2.1 is required, since some parameters (expecially the ones related to banckends) has changed from
+  positional to optional. Pip, deb and rpm packages handle this by themselves, anyway cloning the repos via git and run
+  ./install.sh, sometimes miss dependencies installation (there is an open issue, cause of that).
 
 ### To Know
 
