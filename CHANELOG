@@ -1,0 +1,21 @@
+jwtxploiter v1.1
+
+  FIXED
+  * x5u functions was not converting public numbers to base64
+  * generating jwk was not converting public numbers to base64
+  IMPLEMENTED
+  + Added feature for dump generated key
+  + Merged --complex-payload functionality in --payload (--complex-payload is always avaiable but is deprecated)
+  + Added feature to verify a token against a JWKS file
+  ENANCHEMENT
+  * Wiki updated
+  * Docstrings corrections
+
+ -- Andrea Tedeschi <andrea.tedeschi@andreatedeschi.uno>  Fri, 06 Feb 2021 08:39:41 +0000
+
+
+jwtxploiter v1.0
+
+  + Initial release
+
+ -- Andrea Tedeschi <andrea.tedeschi@andreatedeschi.uno>  Tue, 02 Feb 2021 13:35:49 +0000

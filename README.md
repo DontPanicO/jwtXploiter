@@ -12,6 +12,7 @@ Test a JWT against all known CVEs;
 - And much, much more!
 
 ### Wiki
++ Read the wiki!
 [wiki](https://github.com/DontPanicO/jwtXploiter/wiki)
 
 ### Installation
@@ -41,17 +42,19 @@ N.B. Deb package has to be considered beta
   ./install.sh
   ```
 
+N.B. python3-pip package is required to install dependencies, be sure to have it installed.
+
 ### Who this tool is written for?
 
-- Web Application Penetration Tester / Bug Bounty Hunters
++ Web Application Penetration Tester / Bug Bounty Hunters
 
   - This tool has been written with the aim of become a key part of pentesters toolkit.
 
-- Devs who need to test the secuirty of JWTs used in their applications
++ Devs who need to test the secuirty of JWTs used in their applications
 
-- CTF Players
++ CTF Players
 
-- Not For Students
++ Not For Students
 
   - Since this tool automates lot of stuff, without force the user to know what's happening under the hood, it won't
     help you to understand the vulnerabilities it exploits.
