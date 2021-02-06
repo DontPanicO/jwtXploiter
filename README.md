@@ -42,6 +42,8 @@ N.B. Deb package has to be considered beta
   ./install.sh
   ```
 
+N.B. python3-pip package is required to install dependencies, be sure to have it installed.
+
 ### Who this tool is written for?
 
 + Web Application Penetration Tester / Bug Bounty Hunters
@@ -56,12 +58,6 @@ N.B. Deb package has to be considered beta
 
   - Since this tool automates lot of stuff, without force the user to know what's happening under the hood, it won't
     help you to understand the vulnerabilities it exploits.
-
-### Python cryptography version
-
-+ cryptography >= 3.2.1 is required, since some parameters (expecially the ones related to banckends) has changed from
-  positional to optional. Pip, deb and rpm packages handle this by themselves, anyway cloning the repos via git and run
-  ./install.sh, sometimes miss dependencies installation (there is an open issue, cause of that).
 
 ### To Know
 
