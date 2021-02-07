@@ -1,4 +1,4 @@
-[![Python 3.7|3.9](https://img.shields.io/badge/python-3.7|3.9-blue.svg)](https://www.python.org/) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-red.svg)](https://www.gnu.org/licenses/gpl-3.0) [![release 1.0](https://img.shields.io/badge/release-1.0-yellow.svg)](https://github.com/DontPanicO/jwtXploiter/releases/tag/v1.0) [![pypi 1.0](https://img.shields.io/badge/pypi-1.0-purple.svg)](https://pypi.org/project/jwtxploiter/)
+[![Python 3.7|3.9](https://img.shields.io/badge/python-3.7|3.9-blue.svg)](https://www.python.org/) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-red.svg)](https://www.gnu.org/licenses/gpl-3.0) [![release 1.1](https://img.shields.io/badge/release-1.1-yellow.svg)](https://github.com/DontPanicO/jwtXploiter/releases/tag/v1.1) [![pypi 1.1](https://img.shields.io/badge/pypi-1.1-purple.svg)](https://pypi.org/project/jwtxploiter/)
 
 ### jwtXploiter
 A tool to test security of JSON Web Tokens.
