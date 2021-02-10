@@ -50,8 +50,9 @@ Be sure to:
 
 #### Pull Requests
 
-PRs are also accepted, the repository provides a template to issue them.
-In board terms, required informations are the ones listed for patches.
+Approved PRs will be applied as patches. The repository provides a
+template for PRs. In board terms, required information are the same
+listed above.
 
 ## New Mantainers
 
