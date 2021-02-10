@@ -4,7 +4,7 @@ for_all="$1"
 script_name="jwt-crack.py"
 main_path="$(realpath $0)"
 tool_path=$(echo $main_path | cat | sed 's:install\.sh:jwt-crack\.py:')
-req_path=$(echo $main_path | cat | sed 's:isntall\.sh:requirements\.txt:')
+req_path=$(echo $main_path | cat | sed 's:install\.sh:requirements\.txt:')
 absolute="$(pwd)/$script_name"
 bintool="jwtxpl"
 
