@@ -19,7 +19,7 @@
 """
 
 
-__version__ = "1.1"
+__version__ = "1.2"
 __author__ = "DontPanicO"
 
 import os
@@ -338,7 +338,7 @@ class Cracker:
                     sys.exit(2)
                 """No argument conflict"""
                 if self.dump_key:
-                    print(f"{Bcolors.WARNING}jwtxpl: error: no keys generated with HS*, dumping ignored{Bcolors.ENDC}")
+                    print(f"{Bcolors.WARNING}jwtxpl: warn: no keys generated with HS*, dumping ignored{Bcolors.ENDC}")
                 if self.auto_try is not None:
                     path = Cracker.get_key_from_ssl_cert(self.auto_try)
                     self.path_to_key = path
