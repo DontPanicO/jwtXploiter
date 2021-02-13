@@ -1732,8 +1732,6 @@ class Cracker:
             os.remove("key.pem")
         if os.path.exists("cert.pem"):
             os.remove("cert.pem")
-        if os.path.exists("testing.crt"):
-            os.remove("testing.crt")
         self.devnull.close()
         sys.exit(0)
 
