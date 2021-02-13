@@ -42,7 +42,7 @@ try:
     from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicNumbers
     from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key, Encoding, PrivateFormat, PublicFormat, NoEncryption
     from cryptography import x509
-    from cryptography.x509 import load_pem_x509_certificate
+    from cryptography.x509 import load_pem_x509_certificate, load_der_x509_certificate
     from cryptography.x509.oid import NameOID
     from cryptography.hazmat.backends.openssl import backend
     from cryptography.hazmat.backends.openssl.rsa import _RSAPublicKey, _RSAPrivateKey
