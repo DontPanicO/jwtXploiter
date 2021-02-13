@@ -33,6 +33,7 @@ import re
 import binascii
 import argparse
 import urllib.parse
+from datetime import datetime, timedelta
 
 try:
     from cryptography.hazmat.primitives import hashes
@@ -40,7 +41,9 @@ try:
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
     from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicNumbers
     from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key, Encoding, PrivateFormat, PublicFormat, NoEncryption
+    from cryptography import x509
     from cryptography.x509 import load_pem_x509_certificate
+    from cryptography.x509.oid import NameOID
     from cryptography.hazmat.backends.openssl import backend
     from cryptography.hazmat.backends.openssl.rsa import _RSAPublicKey, _RSAPrivateKey
     from cryptography.hazmat.backends.openssl.ec import _EllipticCurvePublicKey, _EllipticCurvePrivateKey
@@ -1393,7 +1396,7 @@ class Cracker:
     @staticmethod
     def dump_pem_public_key(key, path):
         """
-        :param key: the private key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey orcryptography.hazmat.backends.openssl.rsa._RSAPublicKey
+        :param key: the public key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey orcryptography.hazmat.backends.openssl.rsa._RSAPublicKey
         :param path: the path to the file to dump into -> str
 
         Dumps key bytes into path
@@ -1403,6 +1406,39 @@ class Cracker:
         with open(path, 'wb') as keyfile:
             keyfile.write(key_bytes_data)
         return path
+
+    @staticmethod
+    def gen_self_signed_certificate(private_key, public_key, days, sign_hash):
+        """
+        :param private_key: the private key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePrivateKey orcryptography.hazmat.backends.openssl.rsa._RSAPrivateKey
+        :param public_key: the public key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey orcryptography.hazmat.backends.openssl.rsa._RSAPublicKey
+        :param days: days to certificate expiration -> int
+        :param sign_hash: the hash used for signing -> cryptography.hazmat.hashes
+
+        Generate a self signed certificate with dummy informations
+        :return: the certificate object
+        """
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Testing Inc"),
+            x509.NameAttribute(NameOID.COMMON_NAME, u"Testing"),
+        ])
+        certificate = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            issuer
+        ).public_key(
+            public_key
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.utcnow()
+        ).not_valid_after(
+            datetime.utcnow - timedelta(days=days)
+        ).add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(u"test")]),
+            critical=False
+        ).sign(private_key, sign_hash)
+        return certificate
 
     @staticmethod
     def gen_rsa_public_key_from_jwk(jwk):
