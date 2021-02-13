@@ -142,6 +142,7 @@ class Cracker:
         self.jku_header_injection = jku_header_injection
         self.x5u_basic = x5u_basic
         self.x5u_header_injection = x5u_header_injection
+        self.x5c = None
         self.verify_token_with = verify_token_with
         self.sub_time = sub_time
         self.add_time = add_time
@@ -266,8 +267,7 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: error: too many key related arg {Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
-                key_read_args = [self.path_to_key, self.x5u_basic, self.x5u_header_injection]
-                if not any(key_read_args):
+                if not self.path_to_key:
                     """No key file to read from"""
                     self.key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
                     if self.dump_key:
@@ -276,25 +276,6 @@ class Cracker:
                         print(f"{Bcolors.WARNING}jwtxpl: warn: you should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
                 else:
                     """We have a key file to read from"""
-                    if self.path_to_key:
-                        if not os.path.exists(self.path_to_key):
-                            print(f"{Bcolors.FAIL}jwtxpl: error: no such file: {self.path_to_key}{Bcolors.ENDC}")
-                            sys.exit(7)
-                        if self.dump_key:
-                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored since you passed a key via -k/--key{Bcolors.ENDC}")
-                    if self.x5u_basic or self.x5u_header_injection:
-                        """Req a new cert and a new key file"""
-                        if not self.path_to_key:
-                            keyout = "jwtxpl_rsa_priv.pem" if self.dump_key else "key.pem"
-                            x5u_command = f'openssl req -newkey rsa:2048 -nodes -keyout {keyout} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                            self.path_to_key = keyout
-                        else:
-                            x5u_command = f'openssl req -key {self.path_to_key} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                        try:
-                            subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
-                        except subprocess.CalledProcessError:
-                            print(f"{Bcolors.FAIL}jwtxpl: error: error during cert request, please check your connection{Bcolors.FAIL}")
-                            sys.exit(7)
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
                     if not isinstance(self.key, _RSAPrivateKey):
                         print(f"{Bcolors.FAIL}jwtxpl: error: alg/key mismatch. Key is not a private key or it's not RSA{Bcolors.ENDC}")
@@ -304,6 +285,11 @@ class Cracker:
                 """Extrac the n and the e"""
                 self.key.pub.e = self.key.pub.public_numbers().e
                 self.key.pub.n = self.key.pub.public_numbers().n
+                if any([self.x5u_basic, self.x5u_header_injection]):
+                    sign_hash = Cracker.get_sign_hash(self.alg)
+                    certificate_object = Cracker.gen_self_signed_certificate(self.key, self.key.pub, 30, sign_hash)
+                    certificate_object_content = certificate_object.public_bytes(Encoding.PEM).decode()
+                    self.x5c = "".join([line.strip() for line in certificate_object_content.split("\n") if not line.startswith("---")])
             elif self.alg[:2] == "ES":
                 """Check for key conflicts"""
                 if any(self.cant_asymmetric_args):
@@ -316,8 +302,7 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: error: too many key related argument{Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
-                read_key = [self.path_to_key, self.x5u_basic, self.x5u_header_injection]
-                if not any(read_key):
+                if not self.path_to_key:
                     """We have no key file to read from"""
                     ec_curve = Cracker.get_ec_curve(self.alg)
                     self.key = ec.generate_private_key(ec_curve)
@@ -327,30 +312,6 @@ class Cracker:
                         print(f"{Bcolors.WARNING}jwtxpl: warn: ou should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
                 else:
                     """We have a key file to read from"""
-                    if self.path_to_key:
-                        if not os.path.exists(self.path_to_key):
-                            print(f"{Bcolors.FAIL}jwtxpl: error: no such file: {self.path_to_key}{Bcolors.ENDC}")
-                            sys.exit(7)
-                        if self.dump_key:
-                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored since you passed a key via -k/--key{Bcolors.ENDC}")
-                    if self.x5u_basic or self.x5u_header_injection:
-                        if not self.path_to_key:
-                            if self.alg[-3:] == "256":
-                                curve = "prime256v1"
-                            elif self.alg[-3:] == "384":
-                                curve = "secp384r1"
-                            elif self.alg[-3:] == "512":
-                                curve = "secp521r1"
-                            keyout = "jwtxpl_ec_priv.pem" if self.dump_key else "key.pem"
-                            x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout {keyout} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                            self.path_to_key = keyout
-                        else:
-                            x5u_command = f'openssl req -key {self.path_to_key} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                        try:
-                            subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
-                        except subprocess.CalledProcessError:
-                            print(f"{Bcolors.FAIL}jwtxpl: error: error during cert request, please check your connection{Bcolors.ENDC}")
-                            sys.exit(7)
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
                     if not isinstance(self.key, _EllipticCurvePrivateKey):
                         print(f"{Bcolors.FAIL}jwtxpl: error: alg/key mismatch. Key is not a private key or it's not EC{Bcolors.FAIL}")
@@ -359,6 +320,11 @@ class Cracker:
                 self.key.pub = self.key.public_key()
                 self.key.pub.x = self.key.pub.public_numbers().x
                 self.key.pub.y = self.key.pub.public_numbers().y
+                if any([self.x5u_basic, self.x5u_header_injection]):
+                    sign_hash = Cracker.get_sign_hash(self.alg)
+                    certificate_object = Cracker.gen_self_signed_certificate(self.key, self.key.pub, 30, sign_hash)
+                    certificate_object_content = certificate_object.public_bytes(Encoding.PEM)
+                    self.x5c = "".join([line.strip() for line in certificate_object_content.split("\n") if not line.startswith("---")])
             elif self.alg[:2] == "HS":
                 """Check for key conflicts"""
                 if any(self.jwks_args):
@@ -792,8 +758,6 @@ class Cracker:
         except subprocess.CalledProcessError:
             print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
-        with open("testing.crt", 'r') as cert_file:
-            x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
         if len(jwks_dict['keys']) == 1:
@@ -803,9 +767,9 @@ class Cracker:
             index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             if isinstance(jwks_dict['keys'][index]['x5c'], list):
-                jwks_dict['keys'][index]['x5c'].insert(0, x5c_)
+                jwks_dict['keys'][index]['x5c'].insert(0, self.x5c)
             else:
-                jwks_dict['keys'][index]['x5c'] = x5c_
+                jwks_dict['keys'][index]['x5c'] = self.x5c
             if self.alg[:2] in ["RS", "PS"]:
                 jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
                     self.key.pub.n.to_bytes(self.key.pub.n.bit_length() // 8 + 1, byteorder='big')
@@ -844,8 +808,6 @@ class Cracker:
         except subprocess.CalledProcessError:
             print(f"{Bcolors.FAIL}jwtxpl: error: can't download the jwks file from the url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
-        with open("testing.crt", 'r') as cert_file:
-            x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
         if len(jwks_dict['keys']) == 1:
@@ -855,9 +817,9 @@ class Cracker:
             index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             if isinstance(jwks_dict['keys'][index]['x5c'], list):
-                jwks_dict['keys'][index]['x5c'].insert(0, x5c_)
+                jwks_dict['keys'][index]['x5c'].insert(0,self.x5c)
             else:
-                jwks_dict['keys'][index]['x5c'] = x5c_
+                jwks_dict['keys'][index]['x5c'] = self.x5c
             if self.alg[:2] in ["RS", "PS"]:
                 jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
                     self.key.pub.n.to_bytes(self.key.pub.n.bit_length() // 8 + 1, byteorder='big')
