@@ -24,6 +24,7 @@ __author__ = "DontPanicO"
 
 import os
 import sys
+import socket
 import subprocess
 import hmac
 import hashlib
@@ -1622,7 +1623,14 @@ class Cracker:
         key object.
         :retrun: the decoded public bytes of the public key object. 
         """
-        pem_data = ssl.get_server_certificate((domain, port)).encode()
+        try:
+            pem_data = ssl.get_server_certificate((domain, port)).encode()
+        except socket.gaierror:
+            print(f"{Bcolors.FAIL}jwtxpl: error: host {domain} not known (check you connection){Bcolors.ENDC}")
+            sys.exit(21)
+        except ConnectionRefusedError:
+            print(f"{Bcolors.FAIL}jwtxpl: error: connection refused by {domain}{Bcolors.ENDC}")
+            sys.exit(1)
         cert = load_pem_x509_certificate(pem_data)
         public_key = cert.public_key()
         return public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
