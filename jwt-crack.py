@@ -30,6 +30,7 @@ import hashlib
 import base64
 import json
 import re
+import ssl
 import binascii
 import argparse
 import urllib.parse
@@ -340,8 +341,7 @@ class Cracker:
                 if self.dump_key:
                     print(f"{Bcolors.WARNING}jwtxpl: warn: no keys generated with HS*, dumping ignored{Bcolors.ENDC}")
                 if self.auto_try is not None:
-                    path = Cracker.get_key_from_ssl_cert(self.auto_try)
-                    self.path_to_key = path
+                    self.key = Cracker.get_key_from_ssl_cert(self.auto_try)
                 elif self.kid is not None:
                     if self.kid.lower() == "dirtrv":
                         self.kid = "DirTrv"
@@ -1613,46 +1613,19 @@ class Cracker:
         return iterable
 
     @staticmethod
-    def get_key_from_ssl_cert(domain):
+    def get_key_from_ssl_cert(domain, port=443):
         """
-        :param domain: The domain name of which you want to retrieve the cert -> str
+        :param domain: the hostname of the server of which you want to retrieve the cert -> str
+        :param port: the port for connection -> int
 
-        First open devnull to redirect stdin, stdout or stderr if necessary, and defines a regex pattern to match the output of
-        our first command. Then defines the command that we need to retrieve an ssl cert, launches it with subprocess and handle
-        enventual errors. At this points, the function uses regex to grab the content that wee need, and writes that content in a
-        file (cert.pem). Then defines the second command, and launches it. Since this command should have no output, if we have,
-        breaks out and returns an error. Else stores the path for the generated key, and closes devnull.
-
-        :retrun the path to the generated key.
+        Connect to the target ssl connection to retrieve the certificate. Then extract the public
+        key object.
+        :retrun: the decoded public bytes of the public key object. 
         """
-        devnull_ = open(os.devnull, 'wb')
-        pattern = r'(?:Server\scertificate\s)((.|\n)*?)subject='
-        """Get cert.pem"""
-        first_command = f"openssl s_client -connect {domain}:443"
-        try:
-            first_command_output = subprocess.check_output(
-                first_command, shell=True, stdin=devnull_, stderr=devnull_
-            ).decode('utf-8')
-        except subprocess.CalledProcessError:
-            print(
-                f"{Bcolors.FAIL}jwtxpl: error: openssl s_client can't connect with {domain}. Please make sure to type correctly{Bcolors.ENDC}"
-            )
-            sys.exit(21)
-        cert = re.findall(pattern, first_command_output)[0][0].rstrip("\n")
-        """Write cert.pem"""
-        with open("cert.pem", 'w') as file:
-            file.write(cert)
-        """Extract key.pem"""
-        second_command = "openssl x509 -in cert.pem -pubkey -noout > key.pem"
-        second_command_output = subprocess.check_output(
-            second_command, shell=True, stdin=devnull_, stderr=subprocess.STDOUT
-        )
-        if second_command_output:
-            print(f"{Bcolors.FAIL}jwtxpl: error: cert seems to be invalid{Bcolors.ENDC}")
-            sys.exit(21)
-        key = f"{os.getcwd()}/key.pem"
-        devnull_.close()
-        return key
+        pem_data = ssl.get_server_certificate((domain, port)).encode()
+        cert = load_pem_x509_certificate(pem_data)
+        public_key = cert.public_key()
+        return public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
 
     @staticmethod
     def generate_jwk(kid, public_numbers, jwa="RS256"):
