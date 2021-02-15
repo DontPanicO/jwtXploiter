@@ -123,7 +123,6 @@ class Cracker:
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
         and lastly create a token dictionary, with dictionarize_token, and get decoded header and payload out of it.
-
         """
         print(Cracker.output)
         self.token = token
@@ -203,7 +202,6 @@ class Cracker:
         Same for self.exec_via_kid, where the key does not matter since the code will be executed before the token has been
         validated. If a key has been specified in self.specified_key stores it in self.key. Last, if self.path_to_key has a
         value, checks that the path exists and opens the file to read the key from.
-
         """
         """Validate the token"""
         token_is_valid = Cracker.check_token(self.token)
@@ -380,7 +378,6 @@ class Cracker:
         them on the screen.
         This function is intended to run if -d (or --decode) is present so it prints outs some warnings if useless
         parameters have been called along with -d itself.
-
         """
         other_args = [
                       self.alg, self.path_to_key, self.user_payload, self.complex_payload,
@@ -705,6 +702,7 @@ class Cracker:
     def jku_via_header_injection(self, header):
         """
         :param header: The header dictionary -> dict.
+
         Same as self.jku_basic_attack, but instead of write a jwks file, returns the content in an HTTP response body
         format.
 
@@ -896,12 +894,10 @@ class Cracker:
     def inject_kid(payload):
         """
         A function to test for injections in the kid header.
-
         :param payload: The payload to select -> str
 
         Defines a dictionary containing payloads to inject in the key header, and grabs the ones select by the user.
         This function is intended to be updated with new payloads.
-
         :return: The related payload string
 
         """
@@ -917,11 +913,9 @@ class Cracker:
     def check_token(token):
         """
         A method for verify if a JWT have a valid pattern.
-
         :param token: A JWT -> str.
 
         Creates a regex pattern and looks if the token match it.
-
         :return: True, if the token match the pattern, False if not.
         """
         token_pattern = r"^eyJ.+\.eyJ.+\..*$"
@@ -935,11 +929,9 @@ class Cracker:
     def dictionarize_token(token):
         """
         A method that stores in a dict the three part ok a JWT.
-
         :param token: A JWT -> str.
 
         Splits the token in three part (header, payload, signature) and creates a dict with thees data.
-
         :return: The created dict object
         """
         token_list = token.split(".")
@@ -952,14 +944,11 @@ class Cracker:
     def append_equals_if_needed(string):
         """
         Corrects a string that is intended to be base64 decoded.
-
         :param string: A string, base64 encoded part of a JWT -> str.
 
          Since JWT are base64 encoded but the equals signs are stripped, this function appends them to the
          string given as input, only if necessary.
-
          If the string can't be decoded after the second equal sign has been appended, it returns an error.
-
         :return: A byte-string ready to be base64 decoded.
         """
         encoded = string.encode()
@@ -986,7 +975,6 @@ class Cracker:
 
         The function, given a string, replaces characters specified in the chars parameter with their url encoded one.
         By default, if the space character is not specified in the chars parameter, the function automatically appends it.
-
         :return: The original string with the specified characters url encoded
         """
         if " " not in chars and spaces:
@@ -1003,7 +991,6 @@ class Cracker:
 
         This function simply take the header and the payload from a dictionary created with dictionarize_token, passes
         them to append_equals_if_needed and decodes them.
-
         :return: The decoded header, and the decoded payload as strings.
         """
         if iterable['header'] is None or iterable['payload'] is None:
@@ -1027,7 +1014,6 @@ class Cracker:
 
         Given a string with this 'name:value' format, splits it, look for a <name> key in the iterable and, if it's,
         change its value to <value>. If it doesn't find <name> in the iterable's keys, print an error and quits out.
-
         :return: The dictionary with the changes done.
         """
         try:
@@ -1050,7 +1036,6 @@ class Cracker:
 
         The function first checks that the specified key exists in the dictionary, else returns an error and quits out.
         If the key exists, it delete the related item from the dictionary.
-
         :return: The modified dictionary
         """
         if key not in iterable.keys():
@@ -1067,7 +1052,6 @@ class Cracker:
 
         The function first check that the specified key does not already exists in the dictionary, else returns an error and
         quits out. If the key does not exists, it adds the new items with a default value.
-
         :return: The modified dictionary
         """
         if key in iterable.keys():
@@ -1082,7 +1066,6 @@ class Cracker:
         :param json_string. A json string representing the header or the payload -> str.
 
         Pretty self explanatory...
-
         :return: The base64 encoded string, so one part of the final token.
         """
         encoded_new_segment_bytes = base64.urlsafe_b64encode(json_string.encode("utf-8"))
@@ -1096,7 +1079,6 @@ class Cracker:
         :param payload_: The json string representing the payload -> str
 
         Calls encode_token_segment on header_ and payload_ and then sum them.
-
         :return: The encoded header + the encoded payload as string separated by a dot. The firsts two part of a JWT.
         """
         encoded_header = Cracker.encode_token_segment(header_)
@@ -1517,7 +1499,6 @@ class Cracker:
 
         The function first check for the separator, and quits out if is not present. Then split the string and check for
         integers ones.
-
         :return: The list of keys, or None if separator is not present in string
         """
         if "," not in string:
@@ -1541,7 +1522,6 @@ class Cracker:
 
         If at least one comma is present in the string, the function splits it by commas. Then it checks in the returned
         list, if any empty string exists and, case it is, deletes them. If any value is "null" it convert it in None.
-
         :return: The values list, if string contained values comma separated, else the string itself or None if the string
         was "null".
         """
@@ -1579,7 +1559,6 @@ class Cracker:
         If keys is a string, the script issues vals as it values in iterable. Else, if it's a list, it iterates
         trough the keys list building the path to iterable item to be changed. When the item has been accessed
         (the last iteration in the keys list), it assign it the value generated by build_vals
-
         :return: The modified payload dictionary
         """
         try:
@@ -1713,10 +1692,6 @@ class Cracker:
         print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
         if self.file is not None:
             self.file.close()
-        if os.path.exists("key.pem"):
-            os.remove("key.pem")
-        if os.path.exists("cert.pem"):
-            os.remove("cert.pem")
         self.devnull.close()
         sys.exit(0)
 
