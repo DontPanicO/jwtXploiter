@@ -35,6 +35,8 @@ import ssl
 import binascii
 import argparse
 import urllib.parse
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 
 try:
@@ -663,12 +665,9 @@ class Cracker:
         accesses it to change the modulus and the exponent with the ones of our generated key. Then creates a new
         file named jwks.json in the current working directory and writes the dump of the jwks dict into it.
         """
-        filename = "jwtxpl_jwks.json"
-        command = f"wget -O {filename} " + header['jku']
-        try:
-            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
-        except subprocess.CalledProcessError:
-            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in jku header{Bcolors.ENDC}")
+        filename = Cracker.download_jwks(header['x5u'])
+        if filename is None:
+            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
@@ -708,12 +707,9 @@ class Cracker:
 
         :return: The crafted jwks string in an HTTP response body format.
         """
-        filename = "jwtxpl_jwks.json"
-        command = f"wget -O {filename} " + header['jku']
-        try:
-            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
-        except subprocess.CalledProcessError:
-            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in jku header{Bcolors.ENDC}")
+        filename = Cracker.download_jwks(header['jku'])
+        if filename is None:
+            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
@@ -752,11 +748,8 @@ class Cracker:
         access it and changes the x5c (the X509 cert) with our generated one. Then creates a file named jwks.json
         in the current working directory and write the dump of the jwks dict into it.
         """
-        filename = "jwtxpl_jwks.json"
-        command = f"wget -O {filename} " + header['x5u']
-        try:
-            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
-        except subprocess.CalledProcessError:
+        filename = Cracker.download_jwks(header['x5u'])
+        if filename is None:
             print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
         with open(filename) as jwks_orig_file:
@@ -802,12 +795,9 @@ class Cracker:
 
         :return: The crafted jwks string in an HTTP response body format.
         """
-        filename = "jwtxpl_jwks.json"
-        command = f"wget -O {filename} " + header['x5u']
-        try:
-            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
-        except subprocess.CalledProcessError:
-            print(f"{Bcolors.FAIL}jwtxpl: error: can't download the jwks file from the url specified in x5u header{Bcolors.ENDC}")
+        filename = Cracker.download_jwks(header['x5u'])
+        if filename is None:
+            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
@@ -1388,6 +1378,21 @@ class Cracker:
             critical=False
         ).sign(private_key, sign_hash)
         return certificate
+
+    @staticmethod
+    def download_jwks(url, filename="jwtxpl_jwks.json"):
+        """
+        :param url: the url to the jwks file -> str
+        :param filename: the filename to issue to the downloaded file -> str
+
+        :return: the path to the jwks file
+        """
+        try:
+            urllib.request.urlretrieve(url, filename)
+        except urllib.error.HTTPError:
+            return None
+        except ValueError:
+            return None
 
     @staticmethod
     def gen_rsa_public_key_from_jwk(jwk):
