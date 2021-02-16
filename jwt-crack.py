@@ -34,9 +34,7 @@ import re
 import ssl
 import binascii
 import argparse
-import urllib.parse
-import urllib.request
-import urllib.error
+from urllib import request, parse, error
 from datetime import datetime, timedelta
 
 try:
@@ -969,7 +967,7 @@ class Cracker:
         """
         if " " not in chars and spaces:
             chars += " "
-        encoded = [urllib.parse.quote(char).lower() for char in chars]
+        encoded = [parse.quote(char).lower() for char in chars]
         for i in range(len(chars)):
             string = string.replace(chars[i], encoded[i])
         return string
@@ -1388,8 +1386,8 @@ class Cracker:
         :return: the path to the jwks file
         """
         try:
-            urllib.request.urlretrieve(url, filename)
-        except urllib.error.HTTPError:
+            request.urlretrieve(url, filename)
+        except (error.HTTPError, error.URLError):
             return None
         except ValueError:
             return None
