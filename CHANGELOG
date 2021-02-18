@@ -1,3 +1,16 @@
+jwtxploiter v1.2
+  
+  FIXED
+  * AttirubuteError if jwks file does not contain the verifier key #8
+  * JWKS file not properly generated #7
+  IMPLEMENTED
+  + CVE 2020-28042 null signature
+  ENANCHEMENT
+  * Dropped off pyOpenSSL dependency
+  * Dropped usage of subprocess to internal python methods
+  * Improved --auto-try efficency
+  * Certificates generation now use cryptography library
+
 jwtxploiter v1.1
 
   FIXED
