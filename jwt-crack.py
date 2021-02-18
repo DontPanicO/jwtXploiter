@@ -1369,7 +1369,7 @@ class Cracker:
         ).not_valid_before(
             datetime.utcnow()
         ).not_valid_after(
-            datetime.utcnow - timedelta(days=days)
+            datetime.utcnow + timedelta(days=days)
         ).add_extension(
             x509.SubjectAlternativeName([x509.DNSName(u"test")]),
             critical=False
