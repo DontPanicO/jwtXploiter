@@ -22,7 +22,7 @@ N.B. Deb package has to be considered beta
 + With rpm:
   ```console
   wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter-1.2-1.noarch.rpm
-  sudo rpm --install jwtxploiter-1.1-1.noarch.rpm
+  sudo rpm --install jwtxploiter-1.2-1.noarch.rpm
   ```
 
 + With pip:
@@ -33,7 +33,7 @@ N.B. Deb package has to be considered beta
 + With deb:
   ```console
   wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter_1.2-1_all.deb
-  sudo dpkg -i jwtxploiter_1.1-1_all.deb
+  sudo dpkg -i jwtxploiter_1.2-1_all.deb
   ```
 
 + Cloing the repo:
