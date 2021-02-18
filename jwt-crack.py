@@ -483,7 +483,7 @@ class Cracker:
         sign_hash = Cracker.get_sign_hash(self.alg)
         index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
         if index is None:
-            print(f"{Bcolors.OKBLUE}No keys from {self.find_key_from_jwk} can verify token signature{Bcolors.ENDC}")
+            print(f"{Bcolors.OKBLUE}No keys from {self.find_key_from_jwks} can verify token signature{Bcolors.ENDC}")
             sys.exit(0)
         try:
             result = json.dumps(jwks_dict['keys'][index], indent=2)
@@ -624,7 +624,7 @@ class Cracker:
                 numbers = [self.key.pub.n, self.key.pub.e]
             elif self.alg[:2] == "ES":
                 numbers = [self.key.pub.x, self.key.pub.y]
-            crafted_jwk = Cracker.generate_jwk(jwk_id, numbers, jwa=self.alg)
+            crafted_jwk = Cracker.gen_new_jwk(jwk_id, numbers, jwa=self.alg)
             header_dict = Cracker.embed_jwk_in_jwt_header(header_dict, crafted_jwk)
         if self.user_payload:
             for item in self.user_payload:
@@ -693,7 +693,7 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
         os.remove(filename)
-        with open("jwks.json", 'w'):
+        with open("jwks.json", 'w') as file:
             file.write(json.dumps(jwks_dict, indent=4))
 
     def jku_via_header_injection(self, header):
@@ -781,7 +781,7 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
         os.remove(filename)
-        with open("jwks.json", 'w'):
+        with open("jwks.json", 'w') as file:
             file.write(json.dumps(jwks_dict, indent=4))
 
     def x5u_via_header_injection(self, header):
@@ -1622,7 +1622,7 @@ class Cracker:
         return public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
 
     @staticmethod
-    def generate_jwk(kid, public_numbers, jwa="RS256"):
+    def gen_new_jwk(kid, public_numbers, jwa="RS256"):
         """
         Generation of a jwk claim
         :param kid: The key identifier -> str
