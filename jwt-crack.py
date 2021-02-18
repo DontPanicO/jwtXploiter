@@ -25,7 +25,6 @@ __author__ = "DontPanicO"
 import os
 import sys
 import socket
-import subprocess
 import hmac
 import hashlib
 import base64
