@@ -1390,6 +1390,7 @@ class Cracker:
             return None
         except ValueError:
             return None
+        return filename
 
     @staticmethod
     def gen_rsa_public_key_from_jwk(jwk):
