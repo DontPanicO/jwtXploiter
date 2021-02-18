@@ -662,7 +662,7 @@ class Cracker:
         accesses it to change the modulus and the exponent with the ones of our generated key. Then creates a new
         file named jwks.json in the current working directory and writes the dump of the jwks dict into it.
         """
-        filename = Cracker.download_jwks(header['x5u'])
+        filename = Cracker.download_jwks(header['jku'])
         if filename is None:
             print(f"{Bcolors.FAIL}jwtxpl: error: can't download jwks file from url specified in x5u header{Bcolors.ENDC}")
             sys.exit(1)
