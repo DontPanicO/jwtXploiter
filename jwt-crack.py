@@ -943,7 +943,7 @@ class Cracker:
         i = 0
         while not final_text:
             try:
-                decoded = base64.urlsafe_b64decode(encoded)
+                base64.urlsafe_b64decode(encoded)
                 final_text = encoded
                 return final_text
             except binascii.Error:
@@ -1056,7 +1056,7 @@ class Cracker:
         :return: The base64 encoded string, so one part of the final token.
         """
         encoded_new_segment_bytes = base64.urlsafe_b64encode(json_string.encode("utf-8"))
-        encoded_new_segment_string = str(encoded_new_segment_bytes, 'utf-8').rstrip("=")
+        encoded_new_segment_string = encoded_new_segment_bytes.decode('utf-8').rstrip("=")
         return encoded_new_segment_string
 
     @staticmethod
