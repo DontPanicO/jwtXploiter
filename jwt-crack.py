@@ -630,8 +630,8 @@ class Cracker:
             for item in self.user_payload:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
         if self.complex_payload:
+            print(f"{Bcolors.WARNING}jwtxpl: warn: deprecation warning! --complex-payload has been merged in --payload. You should move towards it. --complex-payload will be removed in future releases{Bcolors.ENDC}")
             for item in self.complex_payload:
-                print(f"{Bcolors.WARNING}jwtxpl: warn: deprecation warning! --complex-payload has been merged in --payload. You should move towards it. --complex-payload will be removed in future releases{Bcolors.ENDC}")
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
         if self.remove_from:
             for item in self.remove_from:
