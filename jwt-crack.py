@@ -256,6 +256,10 @@ class Cracker:
                 if not self.jku_basic and not self.x5u_basic:
                     print(f"{Bcolors.FAIL}jwtxpl: error: you can use --manual only with jku/x5u basic{Bcolors.ENDC}")
                     sys.exit(4)
+            if self.path_to_key:
+                if not os.path.exists(self.path_to_key):
+                    print(f"{Bcolors.FAIL}jwtxpl: error: no such file {self.path_to_key}{Bcolors.ENDC}")
+                    sys.exit(7)
             if self.alg[:2] == "RS" or self.alg[:2] == "PS":
                 """Check for key conflicts"""
                 if any(self.cant_asymmetric_args):
@@ -363,9 +367,6 @@ class Cracker:
                 elif self.blank:
                     self.key = ""
                 if self.path_to_key is not None:
-                    if not os.path.exists(self.path_to_key):
-                        print(f"{Bcolors.FAIL}jwtxpl: error: no such file {self.path_to_key}{Bcolors.ENDC}")
-                        sys.exit(7)
                     self.file = open(self.path_to_key, 'r')
                     self.key = self.file.read()
 
