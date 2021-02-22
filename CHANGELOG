@@ -3,6 +3,7 @@ jwtxploiter v1.2
   FIXED
   * AttirubuteError if jwks file does not contain the verifier key #8
   * JWKS file not properly generated #7
+  * Installation script may miss to install requirements #2 closed by @Auror007
   IMPLEMENTED
   + CVE 2020-28042 null signature
   ENANCHEMENT
