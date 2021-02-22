@@ -55,6 +55,17 @@ except ModuleNotFoundError:
 
 
 
+def ifprint(condition, string):
+    """
+    Conditional printing
+    :param condition: a condition that must be true in order to print -> bool
+    :param string: the string to print if condition is true -> str
+
+    :return: None
+    """
+    if condition:
+        print(string)
+
 class Bcolors:
     """
     A class used to store colors in some constant, to be retrieved later in the script to return a fancy output.
@@ -111,13 +122,13 @@ class Cracker:
         :param sub_time: Hours to subtract from time claims if any -> str
         :param add_time: Hours to add to time claims if any -> str
         :param find_key_from_jwks: Path to JWKS file -> str
-        :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> Bool
-        :param blank: A flag to set if the key has to be an empty string -> Bool
-        :param decode: A flag to set if the user need only to decode the token -> Bool
-        :param manual: A flag to set if the user need to craft an url manually -> Bool
-        :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> Bool
-        :param dump_key: A flag, if present the generated private key will be sotred in a file -> Bool
-        :param null_signature: A flag, if present no signature will be provided -> Bool
+        :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> bool
+        :param blank: A flag to set if the key has to be an empty string -> bool
+        :param decode: A flag to set if the user need only to decode the token -> bool
+        :param manual: A flag to set if the user need to craft an url manually -> bool
+        :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> bool
+        :param dump_key: A flag, if present the generated private key will be sotred in a file -> bool
+        :param null_signature: A flag, if present no signature will be provided -> bool
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
@@ -256,6 +267,10 @@ class Cracker:
                 if not self.jku_basic and not self.x5u_basic:
                     print(f"{Bcolors.FAIL}jwtxpl: error: you can use --manual only with jku/x5u basic{Bcolors.ENDC}")
                     sys.exit(4)
+            if self.path_to_key:
+                if not os.path.exists(self.path_to_key):
+                    print(f"{Bcolors.FAIL}jwtxpl: error: no such file {self.path_to_key}{Bcolors.ENDC}")
+                    sys.exit(7)
             if self.alg[:2] == "RS" or self.alg[:2] == "PS":
                 """Check for key conflicts"""
                 if any(self.cant_asymmetric_args):
@@ -363,9 +378,6 @@ class Cracker:
                 elif self.blank:
                     self.key = ""
                 if self.path_to_key is not None:
-                    if not os.path.exists(self.path_to_key):
-                        print(f"{Bcolors.FAIL}jwtxpl: error: no such file {self.path_to_key}{Bcolors.ENDC}")
-                        sys.exit(7)
                     self.file = open(self.path_to_key, 'r')
                     self.key = self.file.read()
 
@@ -629,8 +641,8 @@ class Cracker:
             for item in self.user_payload:
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
         if self.complex_payload:
+            print(f"{Bcolors.WARNING}jwtxpl: warn: deprecation warning! --complex-payload has been merged in --payload. You should move towards it. --complex-payload will be removed in future releases{Bcolors.ENDC}")
             for item in self.complex_payload:
-                print(f"{Bcolors.WARNING}jwtxpl: warn: deprecation warning! --complex-payload has been merged in --payload. You should move towards it. --complex-payload will be removed in future releases{Bcolors.ENDC}")
                 payload_dict = Cracker.change_payload(item[0], payload_dict)
         if self.remove_from:
             for item in self.remove_from:
@@ -958,7 +970,7 @@ class Cracker:
         """
         :param string: The string to url encode -> str
         :param chars: The only characters to encode in the string -> str
-        :param spaces: If true automatically appends a space to the chars parameter -> Bool
+        :param spaces: If true automatically appends a space to the chars parameter -> bool
 
         The function, given a string, replaces characters specified in the chars parameter with their url encoded one.
         By default, if the space character is not specified in the chars parameter, the function automatically appends it.
