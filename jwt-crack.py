@@ -100,7 +100,7 @@ class Cracker:
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
                  sub_time, add_time, find_key_from_jwks, unverified=False, blank=False, decode=False, manual=False,
-                 generate_jwk=False, dump_key=False, null_signature=False):
+                 generate_jwk=False, dump_key=False, null_signature=False, quiet=False):
         """
         :param token: The user input token -> str
         :param alg: The algorithm for the attack. HS256 or None -> str
@@ -129,12 +129,13 @@ class Cracker:
         :param generate_jwk: A flag, if present a jwk will be generated and inserted in the token header -> bool
         :param dump_key: A flag, if present the generated private key will be sotred in a file -> bool
         :param null_signature: A flag, if present no signature will be provided -> bool
+        :param quiet: A flag, if present only the final token will be printed out, without colored output -> bool
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
         and lastly create a token dictionary, with dictionarize_token, and get decoded header and payload out of it.
         """
-        print(Cracker.output)
+        ifprint(not quiet, Cracker.output)
         self.token = token
         self.alg = alg
         self.path_to_key = path_to_key
@@ -166,6 +167,7 @@ class Cracker:
         self.generate_jwk = generate_jwk
         self.dump_key = dump_key
         self.null_signature = null_signature
+        self.quiet = quiet
         """Groups args based on requirements"""
         self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode, self.null_signature]
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
@@ -176,7 +178,8 @@ class Cracker:
         """Call the validation"""
         self.validation()
         self.token_dict = Cracker.dictionarize_token(token)
-        self.original_token_header, self.original_token_payload = Cracker.decode_encoded_token(self.token_dict)
+        self.original_token_header, self.original_token_payload = Cracker.decode_encoded_token(self.token_dict, quiet=self.quiet)
+
 
     def validation(self):
         """
@@ -253,7 +256,7 @@ class Cracker:
                 if any(self.require_alg_args):
                     print(f"{Bcolors.FAIL}jwtxpl: error: you don't need a key with None/none algorithm{Bcolors.ENDC}")
                     sys.exit(2)
-                print(f"{Bcolors.OKBLUE}INFO: some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
+                ifprint(not self.quiet, f"{Bcolors.OKBLUE}INFO: some JWT libraries use 'none' instead of 'None', make sure to try both.{Bcolors.ENDC}")
             elif self.alg.lower()[:2] in ["rs", "ps", "ec"]:
                 if not any(arg for arg in self.jwks_args + [self.path_to_key, self.verify_token_with, self.find_key_from_jwks, self.unverified, self.null_signature]):
                     print(f"{Bcolors.FAIL}jwtxpl: error: missing a valid key argument for EC/RSA{Bcolors.ENDC}")
@@ -289,7 +292,7 @@ class Cracker:
                     if self.dump_key:
                         Cracker.dump_pem_private_key(self.key, "jwtxpl_rsa_priv.pem")
                     else:
-                        print(f"{Bcolors.WARNING}jwtxpl: warn: you should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
+                        ifprint(not self.quiet, f"{Bcolors.WARNING}jwtxpl: warn: you should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
                 else:
                     """We have a key file to read from"""
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
@@ -325,7 +328,7 @@ class Cracker:
                     if self.dump_key:
                         Cracker.dump_pem_private_key(self.key, "jwtxpl_ec_private.pem")
                     else:
-                        print(f"{Bcolors.WARNING}jwtxpl: warn: ou should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
+                        ifprint(not self.quiet, f"{Bcolors.WARNING}jwtxpl: warn: ou should use -D in order to dump the generated key into a file, so you can reuse it{Bcolors.ENDC}")
                 else:
                     """We have a key file to read from"""
                     self.key = Cracker.read_pem_private_key(self.path_to_key)
@@ -354,7 +357,7 @@ class Cracker:
                     sys.exit(2)
                 """No argument conflict"""
                 if self.dump_key:
-                    print(f"{Bcolors.WARNING}jwtxpl: warn: no keys generated with HS*, dumping ignored{Bcolors.ENDC}")
+                    ifprint(not self.quiet, f"{Bcolors.WARNING}jwtxpl: warn: no keys generated with HS*, dumping ignored{Bcolors.ENDC}")
                 if self.auto_try is not None:
                     self.key = Cracker.get_key_from_ssl_cert(self.auto_try)
                 elif self.kid is not None:
@@ -397,7 +400,8 @@ class Cracker:
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
                       self.x5u_header_injection, self.verify_token_with,
                       self.sub_time, self.add_time, self.find_key_from_jwks,
-                      self.unverified, self.manual, self.generate_jwk, self.dump_key
+                      self.unverified, self.manual, self.generate_jwk, self.dump_key,
+                      self.null_signature, self.quiet
         ]
         if any(arg for arg in other_args):
             print(f"{Bcolors.WARNING}jwtxpl: warn: you have not to specify any other argument if you want to decode the token{Bcolors.ENDC}")
@@ -422,7 +426,8 @@ class Cracker:
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
                       self.x5u_header_injection, self.sub_time, self.add_time,
                       self.find_key_from_jwks, self.unverified, self.decode,
-                      self.manual, self.generate_jwk, self.dump_key
+                      self.manual, self.generate_jwk, self.dump_key, self.null_signature,
+                      self.quiet
         ]
         if any(arg for arg in other_args):
             print(f"{Bcolors.WARNING}jwtxpl: warn: only the alg is required with verification{Bcolors.ENDC}")
@@ -478,7 +483,8 @@ class Cracker:
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
                       self.x5u_header_injection, self.verify_token_with,
                       self.sub_time, self.add_time, self.unverified, self.decode,
-                      self.manual, self.generate_jwk, self.dump_key
+                      self.manual, self.generate_jwk, self.dump_key, self.null_signature,
+                      self.quiet
         ]
         if any(arg for arg in other_args):
             print(f"{Bcolors.WARNING}jwtxpl: warn: only the alg is required with verification{Bcolors.ENDC}")
@@ -541,7 +547,7 @@ class Cracker:
                 if to_dict == "header":
                     header_dict = Cracker.add_key(header_dict, to_add)
                 elif to_dict == "payload":
-                    print(f"{Bcolors.WARNING}jwtxpl: warn: adding key to payload is useless since you can do it directly via --payload{Bcolors.ENDC}")
+                    ifprint(not self.quiet, f"{Bcolors.WARNING}jwtxpl: warn: adding key to payload is useless since you can do it directly via --payload{Bcolors.ENDC}")
                     payload_dict = Cracker.add_key(payload_dict, to_add)
         if self.add_time:
             payload_dict = Cracker.modify_time_claims(self.add_time, payload_dict, instruction="add")
@@ -639,11 +645,11 @@ class Cracker:
             header_dict = Cracker.embed_jwk_in_jwt_header(header_dict, crafted_jwk)
         if self.user_payload:
             for item in self.user_payload:
-                payload_dict = Cracker.change_payload(item[0], payload_dict)
+                payload_dict = Cracker.change_payload(item[0], payload_dict, quiet=self.quiet)
         if self.complex_payload:
-            print(f"{Bcolors.WARNING}jwtxpl: warn: deprecation warning! --complex-payload has been merged in --payload. You should move towards it. --complex-payload will be removed in future releases{Bcolors.ENDC}")
+            ifprint(not self.quiet, f"{Bcolors.WARNING}jwtxpl: warn: deprecation warning! --complex-payload has been merged in --payload. You should move towards it. --complex-payload will be removed in future releases{Bcolors.ENDC}")
             for item in self.complex_payload:
-                payload_dict = Cracker.change_payload(item[0], payload_dict)
+                payload_dict = Cracker.change_payload(item[0], payload_dict, quiet=self.quiet)
         if self.remove_from:
             for item in self.remove_from:
                 try:
@@ -984,7 +990,7 @@ class Cracker:
         return string
 
     @staticmethod
-    def decode_encoded_token(iterable):
+    def decode_encoded_token(iterable, quiet=False):
         """
         :param iterable: A dict object populated with the three parts of a JWT -> dict.
 
@@ -993,7 +999,7 @@ class Cracker:
         :return: The decoded header, and the decoded payload as strings.
         """
         if iterable['header'] is None or iterable['payload'] is None:
-            print(f"{Bcolors.OKBLUE}Please pass the token dict as parameter{Bcolors.ENDC}")
+            ifprint(not quiet, f"{Bcolors.OKBLUE}Please pass the token dict as parameter{Bcolors.ENDC}")
         header_b64 = Cracker.append_equals_if_needed(iterable["header"])
         payload_b64 = Cracker.append_equals_if_needed(iterable["payload"])
         try:
@@ -1565,10 +1571,11 @@ class Cracker:
             return string.lstrip("%")
 
     @staticmethod
-    def change_payload(string, iterable):
+    def change_payload(string, iterable, quiet=False):
         """
         :param string: A key:value pair where key is a set of keys and value a set of values or a single one -> str
         :param iterable: The payload dictionary -> dict
+        :param quiet: The condition to pass to ifprint method -> bool
 
         The function calls build_keys and build_values, passing them the rith part of the string (splitted by ':').
         If keys is a string, the script issues vals as it values in iterable. Else, if it's a list, it iterates
@@ -1584,7 +1591,7 @@ class Cracker:
             sys.exit(5)
         if not isinstance(keys, list):
             if keys not in iterable.keys():
-                print(f"{Bcolors.WARNING}jwtxpl: warn: can't find {keys} in the token payload. It will be added{Bcolors.ENDC}")
+                ifprint(not quiet, f"{Bcolors.WARNING}jwtxpl: warn: can't find {keys} in the token payload. It will be added{Bcolors.ENDC}")
             iterable[keys] = vals
         else:
             i = 0
@@ -1703,8 +1710,11 @@ class Cracker:
         new_partial_token = Cracker.craft_token(header, payload)
         signature = self.select_signature(new_partial_token)
         final_token = new_partial_token + "." + signature
-        print(f"{Bcolors.HEADER}Crafted header ={Bcolors.ENDC} {Bcolors.OKCYAN}{header}{Bcolors.ENDC}, {Bcolors.HEADER}Crafted payload ={Bcolors.ENDC} {Bcolors.OKCYAN}{payload}{Bcolors.ENDC}")
-        print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
+        ifprint(not self.quiet, f"{Bcolors.HEADER}Crafted header ={Bcolors.ENDC} {Bcolors.OKCYAN}{header}{Bcolors.ENDC}, {Bcolors.HEADER}Crafted payload ={Bcolors.ENDC} {Bcolors.OKCYAN}{payload}{Bcolors.ENDC}")
+        if not self.quiet:
+            print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
+        else:
+            print(final_token)
         if self.file is not None:
             self.file.close()
         self.devnull.close()
@@ -1775,6 +1785,10 @@ if __name__ == '__main__':
                         help="Parse a jwks file in order to find the key used to veirfy the token",
                         metavar="<jwks>", required=False,
                         )
+    parser.add_argument("--quiet", action="store_true",
+                        help="Prints out only the crafted token ignoring infos and warnings. It also does not print outs colored output",
+                        required=False
+                        )
     parser.add_argument("--complex-payload", action="append", nargs="+",
                         help="Deprecated, merged with --payload. Since v1.1 --payload cover also subclaims tampering. This option is going to be removed in feature releases.",
                         metavar="<key,key...>:<value>", required=False
@@ -1843,7 +1857,7 @@ if __name__ == '__main__':
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
         args.verify_token_with, args.subtract_time, args.add_time, args.find_key_from_jwks, args.unverified, args.blank, args.decode,
-        args.manual, args.generate_jwk, args.dump_key, args.null_signature
+        args.manual, args.generate_jwk, args.dump_key, args.null_signature, args.quiet
     )
 
     # Start the cracker
