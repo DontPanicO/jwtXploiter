@@ -1091,6 +1091,15 @@ class Cracker:
         return encoded_header + "." + encoded_payload
 
     @staticmethod
+    def dissect_token(jwt):
+        """
+        :param jwt: A JWT
+
+        :return: The token original message and the signature
+        """
+        return ".".join(jwt.split(".")[:2]), jwt.split(".")[2]
+
+    @staticmethod
     def modify_time_claims(qt, iterable, instruction="add"):
         """
         :param qt: The quantity of hours the del/add from time claims -> int
@@ -1158,6 +1167,17 @@ class Cracker:
         return curve
 
     @staticmethod
+    def pem_to_der(pem_sig):
+        """
+        :param pem_sig: A PEM format signature
+        Convert a base64 url encoded signature (PEM FORMAT)
+        to bytes (DER FORMAT)
+
+        :return: The signature in DER format
+        """
+        return base64.urlsafe_b64decode(Cracker.append_equals_if_needed(pem_sig))
+
+    @staticmethod
     def sign_token_with_hmac(key, partial_token, sign_hash):
         """
         :param key: The key used to sign the token -> str
@@ -1220,8 +1240,7 @@ class Cracker:
         Generates a signature using key and checks if it differs from the JWT one
         :return: True, if signatures do not differ, else False. None if token_alg is not valid
         """
-        untrusted_signature = token.split(".")[2]
-        partial_token = ".".join(token.split(".")[:2])
+        partial_token, untrusted_signature = Cracker.dissect_token(token)
         our_signature = Cracker.sign_token_with_hmac(key, partial_token, sign_hash)
         if our_signature == untrusted_signature:
             return True
@@ -1237,11 +1256,10 @@ class Cracker:
 
         :return: False if signature is invalid, True else.
         """
-        partial_token = ".".join(token.split(".")[:2])
-        untrusted_signature_to_decode = Cracker.append_equals_if_needed(token.split(".")[2])
-        untrusted_signature = base64.urlsafe_b64decode(untrusted_signature_to_decode)
+        partial_token, untrusted_pem_signature = Cracker.dissect_token(token)
+        untrusted_der_signature = Cracker.pem_to_der(untrusted_pem_signature)
         try:
-            is_valid_if_none = key.verify(untrusted_signature, partial_token.encode(), algorithm=sign_hash, padding=padding.PKCS1v15())
+            is_valid_if_none = key.verify(untrusted_der_signature, partial_token.encode(), algorithm=sign_hash, padding=padding.PKCS1v15())
         except InvalidSignature:
             return False
         if is_valid_if_none is None:
@@ -1256,12 +1274,11 @@ class Cracker:
 
         :return: False if signature is invalid, True else.
         """
-        partial_token = ".".join(token.split(".")[:2])
-        untrusted_signature_to_decode = Cracker.append_equals_if_needed(token.split(".")[2])
-        untrusted_signature = base64.urlsafe_b64decode(untrusted_signature_to_decode)
+        partial_token, untrusted_pem_signature = Cracker.dissect_token(token)
+        untrusted_der_signature = Cracker.pem_to_der(untrusted_pem_signature)
         try:
             is_valid_if_none = key.verify(
-                untrusted_signature, partial_token.encode(), algorithm=sign_hash,
+                untrusted_der_signature, partial_token.encode(), algorithm=sign_hash,
                 padding=padding.PSS(mgf=padding.MGF1(sign_hash), salt_length=padding.PSS.MAX_LENGTH)
             )
         except InvalidSignature:
@@ -1278,11 +1295,10 @@ class Cracker:
 
         :return: False if signature is invalid, True else.
         """
-        partial_token = ".".join(token.split(".")[:2])
-        untrusted_signature_to_decode = Cracker.append_equals_if_needed(token.split(".")[2])
-        untrusted_signature = base64.urlsafe_b64decode(untrusted_signature_to_decode)
+        partial_token, untrusted_pem_signature = Cracker.dissect_token(token)
+        untrusted_der_signature = Cracker.pem_to_der(untrusted_pem_signature)
         try:
-            is_valid_if_none = key.verify(untrusted_signature, partial_token.encode(), ec.ECDSA(sign_hash))
+            is_valid_if_none = key.verify(untrusted_der_signature, partial_token.encode(), ec.ECDSA(sign_hash))
         except InvalidSignature:
             return False
         if is_valid_if_none is None:
@@ -1423,8 +1439,8 @@ class Cracker:
             e_64 = jwk['e']
         except KeyError:
             return None
-        n_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(n_64))
-        e_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(e_64))
+        n_bytes = Cracker.pem_to_der(n_64)
+        e_bytes = Cracker.pem_to_der(e_64)
         n = int.from_bytes(n_bytes, byteorder="big")
         e = int.from_bytes(e_bytes, byteorder="big")
         public_numbers = RSAPublicNumbers(e, n)
@@ -1446,8 +1462,8 @@ class Cracker:
         except KeyError:
             return None
         ec_curve = Cracker.get_ec_curve(alg)
-        x_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(x_64))
-        y_bytes = base64.urlsafe_b64decode(Cracker.append_equals_if_needed(y_64))
+        x_bytes = Cracker.pem_to_der(x_64)
+        y_bytes = Cracker.pem_to_der(y_64)
         x = int.from_bytes(x_bytes, byteorder="big")
         y = int.from_bytes(y_bytes, byteorder="big")
         public_numbers = EllipticCurvePublicNumbers(x, y, ec_curve)
