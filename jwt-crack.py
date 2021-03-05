@@ -2,7 +2,7 @@
 
 """
     A tool to test the security of JWTs.
-    Copyright (C) 2021  Andea Tedeschi  andreatedeschi95@gmail.com  DontPanicO
+    Copyright (C) 2021  Andea Tedeschi  andrea.tedeschi@andreatedeschi.uno  DontPanicO
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
