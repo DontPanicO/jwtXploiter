@@ -1100,6 +1100,15 @@ class Cracker:
         return ".".join(jwt.split(".")[:2]), jwt.split(".")[2]
 
     @staticmethod
+    def get_original_alg(header):
+        """
+        :param header: The header of the token, base64 encoded
+
+        :return: The algorithm specified in the header
+        """
+        return json.loads(base64.urlsafe_b64decode(Cracker.append_equals_if_needed(header)))['alg']
+
+    @staticmethod
     def modify_time_claims(qt, iterable, instruction="add"):
         """
         :param qt: The quantity of hours the del/add from time claims -> int
