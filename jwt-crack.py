@@ -173,6 +173,7 @@ class Cracker:
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
         self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key, self.blank]
         self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
+        self.keep_alg_args = [self.decode, self.verify_token_with, self.find_key_from_jwks]
         """Open devnull for stdin, stderr, stdout redirects"""
         self.devnull = open(os.devnull, 'wb')
         """Call the validation"""
@@ -237,9 +238,9 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: error: time values must be numeric{Bcolors.ENDC}")
             sys.exit(6)
         """Validate alg"""
-        if not self.decode and not self.verify_token_with:
+        if not any(self.keep_alg_args):
             if not self.alg:
-                print(f"{Bcolors.FAIL}jwtxpl: error: missing --alg. Alg is always required if you are not decoding{Bcolors.ENDC}")
+                print(f"{Bcolors.FAIL}jwtxpl: error: missing --alg. Only verifying and decoding operations can mess it up{Bcolors.ENDC}")
                 sys.exit(4)
         if self.alg is not None:
             valid_algs = [
@@ -478,7 +479,7 @@ class Cracker:
         display it to the user, than quits.
         """
         other_args = other_args = [
-                      self.path_to_key, self.user_payload, self.complex_payload,
+                      self.alg, self.path_to_key, self.user_payload, self.complex_payload,
                       self.remove_from, self.add_into, self.auto_try, self.kid,
                       self.exec_via_kid, self.specified_key, self.jku_basic,
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
@@ -498,8 +499,9 @@ class Cracker:
         except json.decoder.JSONDecodeError:
             print(f"{Bcolors.FAIL}jwtxpl: error: non standard JWKS file{Bcolors.ENDC}")
             sys.exit(1)
-        sign_hash = Cracker.get_sign_hash(self.alg)
-        index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=self.alg)
+        jwa = Cracker.get_original_alg(self.token_dict['header'])
+        sign_hash = Cracker.get_sign_hash(jwa)
+        index = Cracker.find_verifier_key_from_jwks(self.token, jwks_dict, sign_hash, jwa=jwa)
         if index is None:
             print(f"{Bcolors.OKBLUE}No keys from {self.find_key_from_jwks} can verify token signature{Bcolors.ENDC}")
             sys.exit(0)
@@ -1718,7 +1720,7 @@ class Cracker:
         The function to run the attack.
 
         This function will run after main conflicts has already been solved, and call methods that already know which attack to run.
-        First, if self.decode or self.verify_token_with is not None, it run the related methods. After this point we know that alg
+        First, if any decoding or verification operation is required, it run the related methods. After this point we know that alg
         must not be None so, if it's, quits out returning an error.
         Else crafts the token header and payload, signs them and generates the final token. Than prints the final token to stdout and
         checks for open files to close.
@@ -1727,11 +1729,11 @@ class Cracker:
             self.decode_and_quit()
         elif self.verify_token_with is not None:
             self.verify_and_quit()
+        elif self.find_key_from_jwks is not None:
+            self.find_verifier_key_from_jwks_and_quit()
         if self.alg is None:
             print(f"{Bcolors.FAIL}jwtxpl: error: missing --alg. Alg is required if you are not decoding(2){Bcolors.ENDC}")
             sys.exit(4)
-        if self.find_key_from_jwks is not None:
-            self.find_verifier_key_from_jwks_and_quit()
         header, payload = self.modify_header_and_payload()
         new_partial_token = Cracker.craft_token(header, payload)
         signature = self.select_signature(new_partial_token)
