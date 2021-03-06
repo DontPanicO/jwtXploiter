@@ -4,3 +4,6 @@
 #confusion attack. In order to this, we need a fast math
 #library and methods to apply hashing and padding to
 #the message. A new branch for this has been created.
+#We need theese options:
+#1) An option to say that the user want to compute the key
+#2) An option to grab a second token
