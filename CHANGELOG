@@ -1,3 +1,12 @@
+jwtxploiter v1.2.1
+FIXED
+* FileNotFoundError when passing non existing key file to -k/--key #10
+ADDED
+* Quiet option to suppress warnings and colored output, keeping only the crafted token
+ENANCHEMENT
+* Added methods to spped up format conversions (der, pem, int)
+* Algorithm now is not required anymore for verifying operations
+
 jwtxploiter v1.2
   
   FIXED
