@@ -1541,6 +1541,51 @@ class Cracker:
         return None
 
     @staticmethod
+    def get_hash_oid(hash_):
+        """
+        :param hash_: an hashlib object -> hashlib.sha*
+
+        :return: The hash oid
+        """
+        oids = {
+            "sha256": b"\x00010\r\x06\t`\x86H\x01e\x03\x04\x02\x01\x05\x00\x04 ",
+            "sha384": b"\x000A0\r\x06\t`\x86H\x01e\x03\x04\x02\x02\x05\x00\x040",
+            "sha512": b"\x000Q0\r\x06\t`\x86H\x01e\x03\x04\x02\x03\x05\x00\x04@",
+        }
+        return oids[hash_.name]
+
+    @staticmethod
+    def hash_message(msg, jwa):
+        """
+        :param msg: The message to hash -> str
+        :param jwa: The JWA -> str
+        Depending on alg, select the right hash method to apply to msg
+
+        :return: The hash of the messagge
+        """
+        if jwa.endswith("256"):
+            return hashlib.sha256(msg.encode())
+        elif jwa.endswith("384"):
+            return hashlib.sha384(msg.encode())
+        elif jwa.endswith("512"):
+            return hashlib.sha512(msg.encode())
+        else:
+            return None
+
+    @staticmethod
+    def pkcs1_v15_emsa_encoding(m, emlen):
+        """
+        :param m: The hash of a message -> hashlib.sha*
+        :param emlen: The length of the hashed messagge
+        You probably don't want to know what's happening here
+
+        :return: Padded m
+        """
+        oid = Cracker.get_hash_oid(m)
+        to_fill = emlen - len(b"\x00\x01") - len(m.digest()) - len(oid)
+        return b"\x00\x01" + b"\xff" * to_fill + oid + m.digest()
+
+    @staticmethod
     def build_keys(string):
         """
         Build a list of keys
