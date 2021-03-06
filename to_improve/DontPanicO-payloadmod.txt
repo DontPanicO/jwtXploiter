@@ -3,10 +3,3 @@
 # Merging them in only one option will improve the tool performances and
 # the user expirience
 
-
-
-==== Implement subclaims generation ====
-# Until now, calling --payload on a non existing claim will result in its
-# creation while --complex-payload won't (subclaims can only be changes).
-# This can be resolved adding automatic creation of subclaims via
-# --complex-payload or manual creation via --add-into.
