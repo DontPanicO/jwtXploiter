@@ -8,10 +8,3 @@
 #raised when we try to verify the signature with a different
 #key type
 
-
-==== user should not have to specify an alg ====
-#During verification operations, changing the algorithm
-#will broke the signature, so we should not ask the user
-#to specify an algorithm. Not only that, but also, if he
-#pass one, it should be ignored, displaying a proper
-#warning.

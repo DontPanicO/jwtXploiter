@@ -1,0 +1,6 @@
+==== compute rsa public keys ====
+#Since JWTs are pairs of msg:sign, we can use this info
+#to retrieve the public key and try to use it in an alg
+#confusion attack. In order to this, we need a fast math
+#library and methods to apply hashing and padding to
+#the message. A new branch for this has been created.
