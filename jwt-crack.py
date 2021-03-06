@@ -19,7 +19,7 @@
 """
 
 
-__version__ = "1.2"
+__version__ = "1.2.1"
 __author__ = "DontPanicO"
 
 import os
@@ -237,7 +237,7 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: error: time values must be numeric{Bcolors.ENDC}")
             sys.exit(6)
         """Validate alg"""
-        if not self.decode:
+        if not self.decode and not self.verify_token_with:
             if not self.alg:
                 print(f"{Bcolors.FAIL}jwtxpl: error: missing --alg. Alg is always required if you are not decoding{Bcolors.ENDC}")
                 sys.exit(4)
@@ -420,7 +420,7 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: error: no such file: {self.verify_token_with}{Bcolors.ENDC}")
             sys.exit(7)
         other_args = [
-                      self.path_to_key, self.user_payload, self.complex_payload,
+                      self.alg, self.path_to_key, self.user_payload, self.complex_payload,
                       self.remove_from, self.add_into, self.auto_try, self.kid,
                       self.exec_via_kid, self.specified_key, self.jku_basic,
                       self.jku_redirect, self.jku_header_injection, self.x5u_basic,
@@ -429,11 +429,12 @@ class Cracker:
                       self.manual, self.generate_jwk, self.dump_key, self.null_signature,
                       self.quiet
         ]
+        algorithm = Cracker.get_original_alg(self.token_dict['header'])
         if any(arg for arg in other_args):
             print(f"{Bcolors.WARNING}jwtxpl: warn: only the alg is required with verification{Bcolors.ENDC}")
-        sign_hash = Cracker.get_sign_hash(self.alg)
+        sign_hash = Cracker.get_sign_hash(algorithm)
         try:
-            if self.alg[:2] == "RS":
+            if algorithm[:2] == "RS":
                 key = Cracker.read_pem_public_key(self.verify_token_with)
                 if key is None:
                     cert = Cracker.read_pem_certificate(self.verify_token_with)
@@ -442,7 +443,7 @@ class Cracker:
                         sys.exit(6)
                     key = cert.public_key()
                 verified = Cracker.verify_token_with_rsa_pkcs1(key, self.token, sign_hash)
-            elif self.alg[:2] == "PS":
+            elif algorithm[:2] == "PS":
                 key = Cracker.read_pem_public_key(self.verify_token_with)
                 if key is None:
                     cert = Cracker.read_pem_certificate(self.verify_token_with)
@@ -451,7 +452,7 @@ class Cracker:
                         sys.exit(6)
                     key = cert.public_key()
                 verified = Cracker.verify_token_with_rsa_pss(key, self.token, sign_hash)
-            elif self.alg[:2] == "ES":
+            elif algorithm[:2] == "ES":
                 key = Cracker.read_pem_public_key(self.verify_token_with)
                 if key is None:
                     cert = Cracker.read_pem_certificate(self.verify_token_with)
@@ -1717,18 +1718,18 @@ class Cracker:
         The function to run the attack.
 
         This function will run after main conflicts has already been solved, and call methods that already know which attack to run.
-        First, if self.decode is True, run self.decode_and_quit, so the script will quits here. If we goes on, we know that self.alg
-        must not be None, if it's quits out.
+        First, if self.decode or self.verify_token_with is not None, it run the related methods. After this point we know that alg
+        must not be None so, if it's, quits out returning an error.
         Else crafts the token header and payload, signs them and generates the final token. Than prints the final token to stdout and
         checks for open files to close.
         """
         if self.decode:
             self.decode_and_quit()
+        elif self.verify_token_with is not None:
+            self.verify_and_quit()
         if self.alg is None:
             print(f"{Bcolors.FAIL}jwtxpl: error: missing --alg. Alg is required if you are not decoding(2){Bcolors.ENDC}")
             sys.exit(4)
-        if self.verify_token_with is not None:
-            self.verify_and_quit()
         if self.find_key_from_jwks is not None:
             self.find_verifier_key_from_jwks_and_quit()
         header, payload = self.modify_header_and_payload()
