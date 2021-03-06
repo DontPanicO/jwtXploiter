@@ -37,7 +37,7 @@ N.B. Deb package has to be considered beta
 + With deb:
   ```console
   wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter_1.2.1-1_all.deb
-  sudo dpkg -i jwtxploiter_1.2-1_all.deb
+  sudo dpkg -i jwtxploiter_1.2.1-1_all.deb
   ```
 
 + Cloing the repo:
