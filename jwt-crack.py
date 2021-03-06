@@ -1542,6 +1542,15 @@ class Cracker:
         return None
 
     @staticmethod
+    def bytes_to_mpz(der_encoded):
+        """
+        :param der_encoded: A message or a signature in DER format -> bytes
+
+        :return: An mpz object
+        """
+        return mpz(int.from_bytes(der_encoded, byteorder='big'))
+
+    @staticmethod
     def get_hash_oid(hash_):
         """
         :param hash_: an hashlib object -> hashlib.sha*
