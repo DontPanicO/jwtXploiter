@@ -50,6 +50,7 @@ try:
     from cryptography.hazmat.backends.openssl.rsa import _RSAPublicKey, _RSAPrivateKey
     from cryptography.hazmat.backends.openssl.ec import _EllipticCurvePublicKey, _EllipticCurvePrivateKey
     from cryptography.exceptions import InvalidSignature
+    from gmpy2 import mpz, gcd, c_div
 except ModuleNotFoundError:
     print(f"jwtxpl: error: missing dependencies: pip3 install -r requirements.txt")
     sys.exit(11)
