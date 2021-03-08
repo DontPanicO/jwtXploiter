@@ -1597,9 +1597,16 @@ class Cracker:
         return b"\x00\x01" + b"\xff" * to_fill + oid + m.digest()
 
     @staticmethod
-    def hash_and_pad(msg, emlen, jwa):
+    def hash_and_pad(msg, jwa):
+        """
+        :param msg: The original message
+        :param jwa: The token alg
+        
+        Apply hash and pad to msg
+        :return: The presigned message
+        """
         hashed_message = Cracker.hash_message(msg, jwa)
-        padded_message = Cracker.pkcs1_v15_emsa_encoding(hashed_message, emlen)
+        padded_message = Cracker.pkcs1_v15_emsa_encoding(hashed_message, len(hashed_message.digest()))
         return padded_message
 
     @staticmethod
