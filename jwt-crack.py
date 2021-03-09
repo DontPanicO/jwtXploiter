@@ -1157,8 +1157,6 @@ class Cracker:
                 sign_hash = hashes.SHA384()
             elif alg.endswith("512"):
                 sign_hash = hashes.SHA512()
-        else:
-            return None
         return sign_hash
 
     @staticmethod
@@ -1176,8 +1174,6 @@ class Cracker:
             curve = ec.SECP384R1()
         elif alg[-3:] == "521":
             curve = ec.SECP521R1()
-        else:
-            return None    # NEED THIS ELSE?
         return curve
 
     @staticmethod
@@ -1580,16 +1576,14 @@ class Cracker:
             return hashlib.sha384(msg.encode())
         elif jwa.endswith("512"):
             return hashlib.sha512(msg.encode())
-        else:
-            return None
 
     @staticmethod
     def pkcs1_v15_emsa_encoding(m, emlen):
         """
         :param m: The hash of a message -> hashlib.sha*
-        :param emlen: The length of the hashed messagge
+        :param emlen: The length to pad the message to -> int
+        
         You probably don't want to know what's happening here
-
         :return: Padded m
         """
         oid = Cracker.get_hash_oid(m)
@@ -1597,17 +1591,39 @@ class Cracker:
         return b"\x00\x01" + b"\xff" * to_fill + oid + m.digest()
 
     @staticmethod
-    def hash_and_pad(msg, jwa):
+    def hash_and_pad(msg, emlen, jwa):
         """
-        :param msg: The original message
-        :param jwa: The token alg
+        :param msg: The original message -> str
+        :param emlen: The length to pad the message to -> str
+        :param jwa: The token alg -> str
         
         Apply hash and pad to msg
         :return: The presigned message
         """
         hashed_message = Cracker.hash_message(msg, jwa)
-        padded_message = Cracker.pkcs1_v15_emsa_encoding(hashed_message, len(hashed_message.digest()))
+        padded_message = Cracker.pkcs1_v15_emsa_encoding(hashed_message, emlen)
         return padded_message
+
+    @staticmethod
+    def get_primitives(jwt, jwa):
+        """
+        """
+        orig_msg, pem_sig = Cracker.dissect_token(jwt)
+        der_sig = Cracker.pem_to_der(pem_sig)
+        presigned_msg = Cracker.hash_and_pad(orig_msg, len(der_sig), jwa)
+        return Cracker.bytes_to_mpz(presigned_msg), Cracker.bytes_to_mpz(der_sig)
+
+    @staticmethod
+    def compute_moduluses(pair1, pair2, e):
+        """
+        """
+        n_list = list()
+        gcd_res = gcd(pow(pair1[1], e) - pair1[0], pow(pair2[1], e) - pair2[0])
+        for multiplier in range(1,100):
+            modulus = c_div(gcd_res, mpz(multiplier))
+            if pow(pair1[1], e, modulus) == pair1[0]:
+                n_list.append(modulus)
+        return n_list
 
     @staticmethod
     def build_keys(string):
