@@ -175,7 +175,7 @@ class Cracker:
         self.quiet = quiet
         self.exponent = exponent
         """Groups args based on requirements"""
-        self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode, self.null_signature]
+        self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode, self.null_signature, self.compute_public_with]
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
         self.cant_asymmetric_args = [self.auto_try, self.kid, self.exec_via_kid, self.specified_key, self.blank]
         self.require_alg_args = [self.path_to_key] + self.cant_asymmetric_args + self.jwks_args
