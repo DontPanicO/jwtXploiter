@@ -101,8 +101,8 @@ class Cracker:
 
     def __init__(self, token, alg, path_to_key, user_payload, complex_payload, remove_from, add_into, auto_try, kid, exec_via_kid,
                  specified_key, jku_basic, jku_redirect, jku_header_injection, x5u_basic, x5u_header_injection, verify_token_with,
-                 sub_time, add_time, find_key_from_jwks, unverified=False, blank=False, decode=False, manual=False,
-                 generate_jwk=False, dump_key=False, null_signature=False, quiet=False):
+                 sub_time, add_time, find_key_from_jwks, compute_public_with, unverified=False, blank=False, decode=False,
+                 manual=False, generate_jwk=False, dump_key=False, null_signature=False, quiet=False, exponent=65537):
         """
         :param token: The user input token -> str
         :param alg: The algorithm for the attack. HS256 or None -> str
@@ -124,6 +124,7 @@ class Cracker:
         :param sub_time: Hours to subtract from time claims if any -> str
         :param add_time: Hours to add to time claims if any -> str
         :param find_key_from_jwks: Path to JWKS file -> str
+        :param compute_public_with: Another JWT, signed with the same key of the main one -> str
         :param unverified: A flag to set if the script have to act as the host doesn't verify the signature -> bool
         :param blank: A flag to set if the key has to be an empty string -> bool
         :param decode: A flag to set if the user need only to decode the token -> bool
@@ -132,6 +133,7 @@ class Cracker:
         :param dump_key: A flag, if present the generated private key will be sotred in a file -> bool
         :param null_signature: A flag, if present no signature will be provided -> bool
         :param quiet: A flag, if present only the final token will be printed out, without colored output -> bool
+        :param exponent: For public key computation, the public exponent to use -> int
 
         Initialize the variables that we need to be able to access from all the class; all the params plus
         self.file and self.token. Then it call the validation method to validate some of these variables (see below),
@@ -162,6 +164,7 @@ class Cracker:
         self.sub_time = sub_time
         self.add_time = add_time
         self.find_key_from_jwks = find_key_from_jwks
+        self.compute_public_with = compute_public_with
         self.unverified = unverified
         self.blank = blank
         self.decode = decode
@@ -170,6 +173,7 @@ class Cracker:
         self.dump_key = dump_key
         self.null_signature = null_signature
         self.quiet = quiet
+        self.exponent = exponent
         """Groups args based on requirements"""
         self.no_key_validation_args = [self.verify_token_with, self.find_key_from_jwks, self.decode, self.null_signature]
         self.jwks_args = [self.jku_basic, self.jku_redirect, self.jku_header_injection, self.x5u_basic, self.x5u_header_injection, self.generate_jwk]
@@ -851,6 +855,11 @@ class Cracker:
         body = json.dumps(jwks_dict)
         os.remove(filename)
         return body
+
+    def compute_public_keys(self):
+        """
+        """
+        pass
 
     def select_signature(self, partial_token):
         """
@@ -1607,6 +1616,12 @@ class Cracker:
     @staticmethod
     def get_primitives(jwt, jwa):
         """
+        :param jwt: A JSON Web Token -> str
+        :param jwa: The algorithm of the token -> str
+
+        Convert original signature to DER format and apply hash_and_pad method to the original message.
+        Then convert those data to integers and return them
+        :return: The message and the signature as integers
         """
         orig_msg, pem_sig = Cracker.dissect_token(jwt)
         der_sig = Cracker.pem_to_der(pem_sig)
@@ -1616,10 +1631,17 @@ class Cracker:
     @staticmethod
     def compute_moduluses(pair1, pair2, e):
         """
+        :param pair1: The first msg:sign pair (as integers) -> tuple
+        :param pair2: The second msg:sign pair (as integers) -> tuple
+        :param e: The public exponent -> int
+
+        Compute GCD of s1^e - m1 and s2^e - m2, then use the result for compute all
+        possible moduluses.
+        :return: A list composed by every modulus that returned the original message
         """
         n_list = list()
         gcd_res = gcd(pow(pair1[1], e) - pair1[0], pow(pair2[1], e) - pair2[0])
-        for multiplier in range(1,100):
+        for multiplier in range(1,20):
             modulus = c_div(gcd_res, mpz(multiplier))
             if pow(pair1[1], e, modulus) == pair1[0]:
                 n_list.append(modulus)
@@ -1877,6 +1899,10 @@ if __name__ == '__main__':
                         help="Generate token without signature. e.g. HEADER.PAYLOAD.SIGNATURE become HEADER.PAYLOAD.",
                         required=False
                         )
+    parser.add_argument("-e", "--public-exponent", type="int",
+                        help="For public key computation, specify the public key exponent (defalt is 65537)",
+                        metavar="<e>", default=65537, required=False
+                        )
     parser.add_argument("-t", "--subtract-time",
                         help="Hours to delete from time claims if any ('iat', 'exp', 'nbf'). From 1 to 24",
                         metavar="<hours>", required=False
@@ -1897,6 +1923,10 @@ if __name__ == '__main__':
     parser.add_argument("-F", "--find-key-from-jwks",
                         help="Parse a jwks file in order to find the key used to veirfy the token",
                         metavar="<jwks>", required=False,
+                        )
+    parser.add_argument("-C", "--compute-public-with",
+                        help="A second JWT to use for compute the target public key. Quite always, it's going to return more than one possible key",
+                        metavar="<JWT>", required=False
                         )
     parser.add_argument("--quiet", action="store_true",
                         help="Prints out only the crafted token ignoring infos and warnings. It also does not print outs colored output",
@@ -1969,8 +1999,8 @@ if __name__ == '__main__':
     cracker = Cracker(
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
-        args.verify_token_with, args.subtract_time, args.add_time, args.find_key_from_jwks, args.unverified, args.blank, args.decode,
-        args.manual, args.generate_jwk, args.dump_key, args.null_signature, args.quiet
+        args.verify_token_with, args.subtract_time, args.add_time, args.find_key_from_jwks, args.compute_public_with, args.unverified,
+        args.blank, args.decode, args.manual, args.generate_jwk, args.dump_key, args.null_signature, args.quiet, args.exponent
     )
 
     # Start the cracker
