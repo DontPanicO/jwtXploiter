@@ -7,3 +7,4 @@
 #If we use the second option, make sure to handle exceptions
 #raised when we try to verify the signature with a different
 #key type
+
