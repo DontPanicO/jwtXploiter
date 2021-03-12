@@ -19,6 +19,22 @@ if [[ $1 == "" ]]; then
     bindir="$HOME/.local/bin"
     chmod u+x $tool_path
     python3 -m pip install -r $req_path
+    which dnf
+    if [[ $? == "0" ]]; then
+        dnf install python3-gmpy2
+    else
+        which yum
+        if [[ $? == "0" ]]; then
+            yum install python3-gmpy2
+        else
+            wich apt
+            if [[ $? == "0" ]]; then
+                apt install python3-gmpy2
+            else
+                echo "No standard package manager found. python3-gmpy2 installation skipped, please install it manually later"
+            fi
+        fi
+    fi
     ln -s $tool_path $bindir/$bintool
     echo "JWT cracker installed successfully. Now you can use jwtxpl <token> [OPTIONS]"
 
@@ -30,6 +46,21 @@ elif [[ $1 == "all" || $1 == "a" ]]; then
     fi
     chmod +x $tool_path
     pip3 install -r $req_path
+    if [[ $? == "0" ]]; then
+        dnf install python3-gmpy2
+    else
+        which yum
+        if [[ $? == "0" ]]; then
+            yum install python3-gmpy2
+        else
+            wich apt
+            if [[ $? == "0" ]]; then
+                apt install python3-gmpy2
+            else
+                echo "No standard package manager found. python3-gmpy2 installation skipped, please install it manually later"
+            fi
+        fi
+    fi
     sudo ln -s $tool_path /usr/local/bin/$bintool
     echo "JWT cracker installed successfully. Now you can use jwtxpl <token> [OPTIONS]"
 
