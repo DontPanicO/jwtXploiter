@@ -204,7 +204,10 @@ class Cracker:
         others None. Then if an RSA/ec based alg has been set by the user, it checks that he's running a proper attack. Finally,
         set self.alg as uppercase.
 
-        4)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
+        4)Validate public key computation argument: Checks for conflicts, and change the algorithm to HS* based on the original
+        algorithm.
+
+        5)Validate key: This is the most complex validation since the key can be retrieved from different arguments.
         This validation has to solve lot of possible conflicts, at least giving warnings to the user and giving priority
         to the right argument. First, if one of self.decode or self.verify_token_ with is true, all this validation will
         be skipped, since decoding the token does not need any key, and it will quits immediately after the decoded header
@@ -890,7 +893,6 @@ class Cracker:
     def select_signature(self, partial_token):
         """
         Creates a signature for the new token.
-
         :param partial_token: The first two part of the crafted jwt -> str.
 
         If self.unverified is present its define the signature as the one of the original token.
@@ -898,7 +900,6 @@ class Cracker:
         as signature, while with HS256 it encrypts the partial_token with the key (self.keys) and, of course, using
         sha256. It encodes it in base64, and strips all trailing '='. With RSA it use self.key.priv to sign the token,
         using sha256 as algorithm and PKCS1v15 as padding. It encodes it in base64 and strips all trailing '='.
-
         :return: The generated signature.
         """
         signatures = list()
@@ -1622,8 +1623,8 @@ class Cracker:
         """
         :param msg: The message to hash -> str
         :param jwa: The JWA -> str
-        Depending on alg, select the right hash method to apply to msg
 
+        Depending on alg, select the right hash method to apply to msg
         :return: The hash of the messagge
         """
         if jwa.endswith("256"):
