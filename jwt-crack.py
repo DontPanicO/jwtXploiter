@@ -19,7 +19,7 @@
 """
 
 
-__version__ = "1.2.1"
+__version__ = "1.3"
 __author__ = "DontPanicO"
 
 import os
@@ -1060,29 +1060,6 @@ class Cracker:
             print(f"{Bcolors.FAIL}jwtxpl: error: decoding error. Please be sure to pass a valid jwt{Bcolors.ENDC}")
             sys.exit(3)
         return header_, payload_
-
-    @staticmethod
-    def _change_payload(user_input, iterable):
-        """
-        DEPRECATED
-        :param user_input: A key:value string -> str.
-        :param iterable: A dict object representing the original decoded payload of the JWT -> dict.
-
-        Given a string with this 'name:value' format, splits it, look for a <name> key in the iterable and, if it's,
-        change its value to <value>. If it doesn't find <name> in the iterable's keys, print an error and quits out.
-        :return: The dictionary with the changes done.
-        """
-        try:
-            new_payload = user_input.split(":")
-            new_payload_key = new_payload[0]
-            new_payload_value = Cracker.build_values(new_payload[1])
-        except IndexError:
-            print(f"{Bcolors.FAIL}jwtxpl: error: payload changes must have this syntax: name:value. You have written '{user_input}'{Bcolors.ENDC}")
-            sys.exit(5)
-        if new_payload_key not in iterable.keys():
-            print(f"{Bcolors.WARNING}jwtxpl: warn: can't find {new_payload_key} in the token payload. It will be added{Bcolors.ENDC}")
-        iterable[new_payload_key] = new_payload_value
-        return iterable
 
     @staticmethod
     def delete_key(iterable, key):
