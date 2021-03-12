@@ -1,4 +1,4 @@
-[![Python 3.7|3.9](https://img.shields.io/badge/python-3.7|3.9-blue.svg)](https://www.python.org/) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-red.svg)](https://www.gnu.org/licenses/gpl-3.0) [![release 1.2.1](https://img.shields.io/badge/release-1.2.1-yellow.svg)](https://github.com/DontPanicO/jwtXploiter/releases/tag/v1.2.1) [![pypi 1.2.1](https://img.shields.io/badge/pypi-1.2.1-purple.svg)](https://pypi.org/project/jwtxploiter/)
+[![Python 3.7|3.9](https://img.shields.io/badge/python-3.7|3.9-blue.svg)](https://www.python.org/) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-red.svg)](https://www.gnu.org/licenses/gpl-3.0) [![release 1.3](https://img.shields.io/badge/release-1.3-yellow.svg)](https://github.com/DontPanicO/jwtXploiter/releases/tag/v1.3) [![pypi 1.3](https://img.shields.io/badge/pypi-1.3-purple.svg)](https://pypi.org/project/jwtxploiter/)
 
 ### jwtXploiter
 A tool to test security of JSON Web Tokens.
@@ -13,6 +13,7 @@ Test a JWT against all known CVEs;
 
 ### Wiki
 + Read the wiki!
+
 [wiki](https://github.com/DontPanicO/jwtXploiter/wiki)
 
 ### Installation
@@ -21,12 +22,12 @@ N.B. Deb package has to be considered beta
 
 + With rpm:
   ```console
-  wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter-1.2.1-1.noarch.rpm
-  sudo rpm --install jwtxploiter-1.2.1-1.noarch.rpm
+  wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter-1.3-1.noarch.rpm
+  sudo rpm --install jwtxploiter-1.3-1.noarch.rpm
   ```
   or, if previous version is installed on your machine
   ```console
-  sudo rpm --upgrade jwtxploiter-1.2.1-1.noarch.rpm
+  sudo rpm --upgrade jwtxploiter-1.3-1.noarch.rpm
   ```
 
 + With pip:
@@ -36,8 +37,8 @@ N.B. Deb package has to be considered beta
 
 + With deb:
   ```console
-  wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter_1.2.1-1_all.deb
-  sudo dpkg -i jwtxploiter_1.2.1-1_all.deb
+  wget http://andreatedeschi.uno/jwtxploiter/jwtxploiter_1.3-1_all.deb
+  sudo dpkg -i jwtxploiter_1.3-1_all.deb
   ```
 
 + Cloing the repo:
@@ -62,6 +63,11 @@ N.B. python3-pip package is required to install dependencies, be sure to have it
 
   - Since this tool automates lot of stuff, without force the user to know what's happening under the hood, it won't
     help you to understand the vulnerabilities it exploits.
+
+### RSA Public key computation
+
+Since version 1.3, the tool provides options to compute a public key (belongin to the private used to sign the token)
+basing on two JWTs. Read the [wiki](https://github.com/DontPanicO/jwtXploiter/wiki) for more information.
 
 ### To Know
 
